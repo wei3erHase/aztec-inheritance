@@ -1,0 +1,28 @@
+name: Poison Patterns
+
+# Verifies that each package in src/poison/ fails compilation with the
+# expected error. Runs in parallel with the main PR checks workflow.
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  poison-patterns:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nargo
+        run: |
+          curl -L https://raw.githubusercontent.com/noir-lang/noirup/main/install | bash
+          echo "$HOME/.nargo/bin" >> $GITHUB_PATH
+
+      - name: Pin Nargo version
+        run: noirup --version 1.0.0-beta.19
+
+      - name: Run poison pattern tests
+        run: ./scripts/test-poison-patterns.sh
