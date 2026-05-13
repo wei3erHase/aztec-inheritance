@@ -60,17 +60,17 @@ One sentence.
 
 ## PR sequence
 
-### PR-1: Transitive composition -- inject or warn
+### PR-1: Transitive composition -- flatten transitive dependencies
 
 **Closes:** G-1  
-**Effort:** Medium (injection) or Small (warning fallback)  
+**Effort:** Medium (implemented)
 **Blocker:** None
+**Scope rule:** PR-1 should remain one-feature only (compose recursion + tests + doc updates). Do not merge other PoCs into this PR.
 
-**What it adds:** When a host composes `mid_template` and `mid_template` itself composed
-`foo_template`, the host currently silently does not get `foo_value()`. This PR either fixes
-that by injecting transitively (preferred) or emits a compile warning as a fallback.
+**What it adds:** Transitive template dependencies are now flattened during compose expansion.
+Composing `mid_template` now includes `mid_template`'s own dependencies (`foo_template`, etc.) automatically.
 
-**Implementation sketch (injection path -- try this first):**
+**Implementation sketch (implemented):**
 
 1. In `#[contract_template]` processing, after resolving the contract's compose config, register
    the composed template IDs in a new registry map:
@@ -81,18 +81,10 @@ that by injecting transitively (preferred) or emits a compile warning as a fallb
 3. Same collision rules apply to transitively injected functions (collision without override =
    error; same as today for direct templates).
 
-**Implementation sketch (warning fallback -- if injection proves complex):**
-
-In `compose_template.nr`, after resolving each template module, check whether it has any entries
-in `TEMPLATE_COMPOSED_IDS`. If so, emit a `println!` diagnostic listing the grandchild ids that
-are NOT being injected.
-
 **Open questions for discussion:**
-1. Injection or warning? Injection is more useful but has multi-path collision edge cases.
-2. If a grandchild function appears via two paths (host composes A and B, both composed C), is
-   deduplication the right behavior, or should we error and ask the host to explicitly list C?
-3. Should transitive injection be opt-in (`compose_deep("mid")`) rather than default, to keep
-   the current explicit-listing behavior available?
+1. If a grandchild function appears via two paths (host composes A and B, both composed C), is
+   deduplication the right behavior, or should we require an explicit include list?
+2. Should transitive injection remain default, or should there be an explicit deep-compose opt-in path?
 
 **Doc updates:**
 - `02-feature-matrix.md`: entry #8 status changes from `KNOWN_GAP` to `IMPLEMENTED`
@@ -142,6 +134,7 @@ module. The host no longer needs to manually re-declare event structs used in co
 **Closes:** G-2 (matrix #10), sets foundation for #16  
 **Effort:** Large  
 **Blocker:** None (macro-level only, no language changes needed)
+**Current worktree status:** implementation wired for per-function registry storage + override-aware injection/quoted filtering (validation exists, but test/fixture coverage still needed).
 
 **What it adds:** A host can override a specific template function. The template must declare the
 function as overridable. Collision without an override declaration remains a fatal error with a

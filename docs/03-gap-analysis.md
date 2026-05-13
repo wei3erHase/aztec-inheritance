@@ -10,35 +10,32 @@ explained inline in the matrix.
 
 ---
 
-## G-1: Transitive composition is not flattened (silent fail)
+## G-1: Transitive composition is flattened
 
-**Gap:** Composing a template that itself composes others does NOT include grandchild functions
-in the host. Only direct template functions are injected. The compiler emits no warning -- the
-host simply does not get those functions, which can be surprising.
+**Status:** Implemented (PR-1).
 
-**Root cause:** `inject_template_functions_to_registries` iterates the requested template keys
-and injects only their own `FunctionDefinition`s. It does not recurse into what those templates
-themselves composed.
+**Implementation:** Composing a template now recursively injects all transitive template functions.
+Function-name collisions still follow existing compose collision rules.
 
-**Evidence:** `composition_transitive` -- `mid_value()` is callable (direct template function),
-`foo_value()` is silently absent (grandchild, not flattened).
+**Root cause (historical):** `inject_template_functions_to_registries` previously only injected
+the directly composed templates and ignored their dependencies.
 
-**Decision:** The non-flattening behavior is correct and intentional (D-1 below). The silent fail
-is the problem. Planned fix: emit a compiler warning when `inject_template_functions_to_registries`
-detects that a selected template itself has composed templates, so the developer knows transitive
-functions are NOT included.
+**Evidence:** `composition_transitive` -- `mid_value()`, `foo_value()`, and `bar_value()` are all
+callable from the host.
+
+**Decision:** PR-1 implemented recursive expansion and removed this gap.
 
 **Solidity equivalent:** `C is B, A` flattens the full hierarchy. Gap on flattening is accepted;
 the warning closes the UX gap.
 
 ---
 
-## G-2: No virtual/override mechanism (planned)
+## G-2: No virtual/override mechanism (blocked)
 
 **Gap:** Two composed templates with the same function name cause a compile error. The host cannot
-override a composed template function. This is a PLANNED_CHANGE -- the collision diagnostic is
-correct and good; the missing feature is allowing the host to intentionally replace a template
-function.
+override a composed template function. This is currently blocked by registry shape: template wrappers
+and ABI exports are stored as per-template aggregates, so selective override filtering is not
+implemented without a deeper refactor.
 
 **Root cause:** The compose machinery generates one `__aztec_nr_internals__<fn_name>` wrapper per
 function. `generate_public_dispatch` rejects duplicate selectors. There is no mechanism to mark a
@@ -100,7 +97,7 @@ linearization, no implicit ordering.
 
 **Implications:**
 - Multi-compose is flat: all templates at the same level with equal precedence
-- No transitive flattening (G-1); developer must list all templates explicitly
+- Transitive flattening (G-1); all composed templates are recursively included by `compose()`
 - No override chain today (G-2); planned for M4
 - `super` does not apply: there is no "parent implementation" in a flat merge
 - All composed function names must be unique across the host and all composed templates
