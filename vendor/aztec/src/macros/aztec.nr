@@ -102,6 +102,8 @@ pub comptime fn aztec(m: Module, args: [AztecConfig]) -> Quoted {
         panic(f"#[aztec] expects 0 or 1 arguments, got {num_args}")
     };
 
+    template_registry::register_composed_template_ids(m, config.composed_templates);
+
     // If contract templates are enabled, populate the host's composed registries with the
     // selected templates' FunctionDefinitions so that interface/stub generators include them.
     if config.composed_templates.len() > 0 {
@@ -163,7 +165,7 @@ pub comptime fn aztec(m: Module, args: [AztecConfig]) -> Quoted {
     let (has_public_init_nullifier_fn, emit_public_init_nullifier_fn_body) = generate_emit_public_init_nullifier(m);
     let public_dispatch = generate_public_dispatch(m, has_public_init_nullifier_fn);
 
-    let (composed_functions, composed_abi_exports, composed_self_call_structs) =
+    let (composed_functions, composed_abi_exports, composed_events) =
         if config.composed_templates.len() > 0 {
         get_composed_templates_quoted(config.composed_templates)
     } else {
@@ -173,8 +175,8 @@ pub comptime fn aztec(m: Module, args: [AztecConfig]) -> Quoted {
     quote {
         $interface
         $self_call_structs
-        $composed_self_call_structs
         $call_internal_struct
+        $composed_events
         $functions
         $composed_functions
         $fn_abi_exports

@@ -27,31 +27,28 @@ proof (pass/fail). Zero hypotheses unresolved.
 | 5 | Composed internal writes host storage field | PASS | `composition_host`: `host_set_and_get(99)` via `self.internal._foo_set(99)` returns 99 | **IMPLEMENTED** |
 | 6 | Library method constant migrated cross-crate | PASS | `composition_host`: `host_library_constant()` == 42; `foo_magic_via_helper()` == 42 | **IMPLEMENTED** |
 | 7 | Constructor/initializer chain | PASS | `amm_token`: constructor calls `self.internal._initialize_token(TokenInitParams {...})` | **IMPLEMENTED** |
-| 8 | Composing a transitive template does not silently flatten grandchild functions | SILENT FAIL | `composition_transitive`: `foo_value()` silently absent; no compiler warning | **KNOWN_GAP** |
+| 8 | Transitive composition flattens grandchild templates | PASS | `composition_transitive`: `mid_value()`, `foo_value()`, and `bar_value()` are all callable | **IMPLEMENTED** |
 | 9 | Function name collision is a hard compile error | PASS | `composition_collision_fail`: "selector collision between foo_value and foo_value" at dispatch generation | **IMPLEMENTED** |
 | 10 | Host can override a specific template function | NOT YET | No override mechanism; collision is fatal today | **PLANNED_CHANGE** |
 | 11 | `super` call to base implementation | N/A | Compose is flat/non-hierarchical; there is no base, no chain, no `super` concept | **OUT_OF_SCOPE** |
 | 12 | Global names in composed bodies resolve in host scope | PASS (with pattern) | Host declares or imports `FOO_MAGIC`; injected body resolves it. Template must not self-reference its own module globals -- use `#[contract_library_method]` for template-owned constants | **IMPLEMENTED** |
-| 13 | Event structs auto-injected into host from template | FAIL | Host must re-declare every event struct used in composed bodies; language-blocked | **KNOWN_GAP** |
+| 13 | Event structs auto-injected into host from template | PASS | Event struct declarations from templates are replayed automatically | **IMPLEMENTED** |
 | 14 | Host declares all template storage fields manually | PASS (by design) | Host fully owns its storage; templates have no private storage and should not reference slots by id | **BY_DESIGN** |
 | 15 | Storage slot ordering is host-controlled | PASS (by design) | `storage.nr` assigns slots per `fields_as_written()` order in host's Storage struct | **BY_DESIGN** |
 | 16 | Abstract template (all-virtual, not deployable) | NOT YET | Implementable alongside #10: a template with only virtual functions is abstract by convention | **PLANNED_CHANGE** |
 | 17 | `private` function inaccessible to host (Solidity visibility) | N/A | Compose copies quoted function bodies, not Solidity-style imports. There is no private scope in the copy model -- all composed functions are visible to the host | **OUT_OF_SCOPE** |
 | 18 | Inheritable/overridable modifiers | N/A | Aztec uses function-level attributes (`#[only_self]`, `#[authorize_once]`); no modifier chain | **OUT_OF_SCOPE** |
 
-**Summary: 9 IMPLEMENTED, 2 PLANNED_CHANGE, 3 KNOWN_GAP, 2 BY_DESIGN, 3 OUT_OF_SCOPE, 0 UNRESOLVED**
+**Summary: 11 IMPLEMENTED, 2 PLANNED_CHANGE, 0 KNOWN_GAP, 2 BY_DESIGN, 3 OUT_OF_SCOPE, 0 UNRESOLVED**
 
 ---
 
 ## Notes on selected entries
 
-### #8 -- transitive composition: silent fail is the real problem
+### #8 -- transitive composition is now flattened
 
-The behavior itself is correct by design (see D-1 in gap analysis). The problem is user experience:
-composing `mid_template` produces no warning that `foo_template` and `bar_template` functions are
-NOT included. Planned improvement: emit a compiler warning when `inject_template_functions_to_registries`
-detects that a selected template itself has composed templates (indicating the developer may have
-expected transitive flattening).
+Composing `mid_template` now recursively injects transitive template functions, so `foo_value()` and `bar_value()`
+are callable from the host without additional `compose(...)` entries.
 
 ### #12 -- globals are host-scope bindings, not template-owned statics
 
@@ -111,7 +108,7 @@ Aztec template composition is **merge-and-replay**, not Solidity `is`-based inhe
 | Name collision detection (hard error) | Yes |
 | Virtual/override single function | Planned (M4) |
 | Abstract templates | Planned (M4, follows from virtual/override) |
-| Transitive template flattening | No (accepted; warn on silent skip is planned) |
-| Automatic event struct injection | No (language-blocked) |
+| Transitive template flattening | Yes |
+| Automatic event struct injection | Yes (template replay) |
 
 Root causes and decisions for known gaps: [docs/03-gap-analysis.md](03-gap-analysis.md)

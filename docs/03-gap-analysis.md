@@ -10,23 +10,21 @@ explained inline in the matrix.
 
 ---
 
-## G-1: Transitive composition is not flattened (silent fail)
+## G-1: Transitive composition is flattened
 
-**Gap:** Composing a template that itself composes others does NOT include grandchild functions
-in the host. Only direct template functions are injected. The compiler emits no warning -- the
-host simply does not get those functions, which can be surprising.
+**Status:** Implemented (PR-1).
 
-**Root cause:** `inject_template_functions_to_registries` iterates the requested template keys
-and injects only their own `FunctionDefinition`s. It does not recurse into what those templates
-themselves composed.
+**Implementation:** Composing a template now recursively injects all transitive template functions.
+Only direct template collisions are skipped only by normal existing collision rules.
 
-**Evidence:** `composition_transitive` -- `mid_value()` is callable (direct template function),
-`foo_value()` is silently absent (grandchild, not flattened).
+**Root cause (historical):** `inject_template_functions_to_registries` previously iterated only the
+requested template keys and injected only their own `FunctionDefinition`s, with no recursion.
 
-**Decision:** The non-flattening behavior is correct and intentional (D-1 below). The silent fail
-is the problem. Planned fix: emit a compiler warning when `inject_template_functions_to_registries`
-detects that a selected template itself has composed templates, so the developer knows transitive
-functions are NOT included.
+**Evidence:** `composition_transitive` -- `mid_value()`, `foo_value()`, and `bar_value()` are all
+callable from the host.
+
+**Decision:** PR-1 implemented recursive expansion and removed this gap. Remaining behavior remains
+that function-name collisions still produce hard compile errors.
 
 **Solidity equivalent:** `C is B, A` flattens the full hierarchy. Gap on flattening is accepted;
 the warning closes the UX gap.
@@ -63,32 +61,29 @@ function as "overridable" or build an override chain.
 
 ---
 
-## G-3: Event struct types must be re-declared in host (language-blocked)
+## G-3: Event structs used by composed bodies are auto-replayed (implemented)
 
-**Gap:** Event structs defined in a template and used in composed function bodies must be re-declared
-in the host module. There is no automatic injection.
+**Gap status:** Implemented.
+
+**Gap:** Host-side `#[event]` type declaration was previously required for event structs defined in templates
+that were referenced from composed function bodies.
 
 **Root cause:** Composed function bodies carry raw token streams. The body `{ self.emit(FooEvt {...}) }`
-resolves `FooEvt` in the host module's scope at injection time. If the host does not declare `FooEvt`,
-the injection fails to compile with "could not resolve FooEvt in path".
+resolves `FooEvt` in the host module's scope at injection time.
 
-This is the same root cause as host-scope global resolution (#12 in the matrix): all identifiers in
-composed bodies resolve in host scope. The difference is that event structs cannot be "imported from
-the template crate" the same way globals can, because `#[event]` registration is part of the Aztec
-contract machinery and the struct type must be physically declared in the host module for the
-`self.emit(...)` call to type-check.
+This is now closed by replaying template event declarations during composition:
 
-**Evidence:** `composition_host/src/main.nr` must declare `#[event] struct FooEvt { value: u32 }`.
-Same pattern as `Transfer` re-declaration in `amm_token/src/main.nr`.
+1. `#[contract_template]` stores declarations for all template structs marked `#[event]` in
+   `template_registry.nr`.
+2. `get_composed_templates_quoted` replays these declarations into the host output.
+3. Existing event selector registration remains idempotent to tolerate harmless duplicate registration.
 
-**Decision:** Accept for this PoC. Document as a template authoring rule.
+**Evidence:** `composition_host/src/main.nr` now composes `FooStorageTemplate` without a manually declared
+`FooEvt` and still compiles/runs via composed `foo_increment`.
 
-**Potential improvement:** `#[contract_template]` registers event struct `Quoted` definitions
-alongside function wrappers and replays them into the host. Architecturally feasible (the hook
-point in `template_registry.nr` exists) but requires careful ordering relative to Aztec's own
-event selector registration. Deferred to M5.
+**Decision:** Implemented in PR-2.
 
-**Solidity equivalent:** Base contract events are directly usable in derived contracts. Gap is real.
+**Solidity equivalent:** Base contract events are directly usable in derived contracts.
 
 ---
 
@@ -100,7 +95,7 @@ linearization, no implicit ordering.
 
 **Implications:**
 - Multi-compose is flat: all templates at the same level with equal precedence
-- No transitive flattening (G-1); developer must list all templates explicitly
+- Transitive flattening (G-1); all composed templates are recursively included by `compose()`
 - No override chain today (G-2); planned for M4
 - `super` does not apply: there is no "parent implementation" in a flat merge
 - All composed function names must be unique across the host and all composed templates

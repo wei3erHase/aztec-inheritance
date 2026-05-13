@@ -10,18 +10,60 @@
 //!
 //! 2. `get_composed_templates_quoted(template_ids)`: Returns the pre-generated Quoted code (stored
 //!    by `#[contract_template(...)]`) for the `__aztec_nr_internals__` wrappers, contract library
-//!    helpers, and ABI export structs. This avoids the Noir cross-crate `f.body()` limitation since
-//!    the bodies were captured in the template crate.
+//!    helpers, ABI exports, and event declarations. This avoids the Noir cross-crate `f.body()` limitation
+//!    for bodies and includes event declarations captured from templates.
 
 use crate::macros::{
     internals_functions_generation::{external_functions_registry, internal_functions_registry},
     template_registry,
 };
 
+comptime fn contains_field(values: [Field], value: Field) -> bool {
+    let mut found = false;
+    for existing in values {
+        if existing == value {
+            found = true;
+            break;
+        }
+    }
+    found
+}
+
+comptime fn flatten_template_keys(template_keys: [Field]) -> [Field] {
+    let mut processed = @[];
+    let mut pending = template_keys;
+
+    let mut index = 0;
+    while index < pending.len() {
+        let template_key = pending[index];
+        let template_module_opt = template_registry::get_template_module(template_key);
+        assert(
+            template_module_opt.is_some(),
+            "compose: no contract template registered for one of the requested template ids",
+        );
+
+        if !contains_field(processed, template_key) {
+            processed = processed.push_back(template_key);
+
+            let template_module = template_module_opt.unwrap();
+            let child_template_ids =
+                template_registry::get_template_composed_template_ids(template_module).unwrap_or(@[]);
+            for child_template_key in child_template_ids {
+                pending = pending.push_back(child_template_key);
+            }
+        }
+
+        index += 1;
+    }
+
+    processed
+}
+
 /// Populates the host module's composed registries with the selected templates'
 /// FunctionDefinitions. This enables the interface/stub generators to include composed functions
 /// without accessing function bodies (no cross-crate limitation applies here).
 pub(crate) comptime fn inject_template_functions_to_registries(host: Module, template_keys: [Field]) {
+    let template_keys = flatten_template_keys(template_keys);
     for template_key in template_keys {
         let template_module_opt = template_registry::get_template_module(template_key);
         assert(
@@ -58,13 +100,14 @@ pub(crate) comptime fn inject_template_functions_to_registries(host: Module, tem
 /// - `functions`: all `__aztec_nr_internals__` wrappers (private, public, utility, internal) plus
 ///   contract library helpers referenced by them.
 /// - `abi_exports`: all ABI export parameter/abi structs.
-/// - `_self_call_structs`: Always empty (the host's `generate_external_function_self_calls_structs`
-///   covers them via the composed registries).
+/// - `events`: all `#[event]` struct declarations.
 ///
 /// Panics if any requested template id has not been registered.
 pub(crate) comptime fn get_composed_templates_quoted(template_keys: [Field]) -> (Quoted, Quoted, Quoted) {
     let mut all_functions = quote {};
     let mut all_abi_exports = quote {};
+    let mut all_events = quote {};
+    let template_keys = flatten_template_keys(template_keys);
 
     for template_key in template_keys {
         let functions_opt = template_registry::get_template_functions(template_key);
@@ -76,10 +119,12 @@ pub(crate) comptime fn get_composed_templates_quoted(template_keys: [Field]) -> 
         let abi_exports_opt = template_registry::get_template_abi_exports(template_key);
         let contract_library_methods_opt =
             template_registry::get_template_contract_library_methods(template_key);
+        let events_opt = template_registry::get_template_events(template_key);
 
         let functions = functions_opt.unwrap();
         let abi_exports = abi_exports_opt.unwrap_or(quote {});
         let contract_library_methods = contract_library_methods_opt.unwrap_or(quote {});
+        let events = events_opt.unwrap_or(quote {});
 
         all_functions = quote {
             $all_functions
@@ -90,7 +135,12 @@ pub(crate) comptime fn get_composed_templates_quoted(template_keys: [Field]) -> 
             $all_abi_exports
             $abi_exports
         };
+
+        all_events = quote {
+            $all_events
+            $events
+        };
     }
 
-    (all_functions, all_abi_exports, quote {})
+    (all_functions, all_abi_exports, all_events)
 }

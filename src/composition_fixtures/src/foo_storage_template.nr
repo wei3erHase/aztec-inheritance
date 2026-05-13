@@ -4,13 +4,13 @@ use aztec::macros::{aztec, contract_template};
 ///
 /// Surfaces:
 /// - Storage: `foo_counter: PublicMutable<u32>`
-/// - Event: `FooEvt { value: u32 }` -- host must re-declare this struct
+/// - Event: `FooEvt { value: u32 }` -- now auto-replayed for composed hosts
 /// - External: `foo_increment()`, `foo_get() -> u32`, `foo_magic_via_helper() -> u32`
 /// - Internal: `_foo_set(value: u32)`
 /// - Library method (migrated): `_foo_magic() -> u32`
 ///
 /// NOTE: raw globals (e.g. FOO_MAGIC) are NOT migrated -- see foo_raw_global_template.
-/// NOTE: event structs used in composed bodies must be re-declared in the host.
+/// NOTE: event structs used in composed bodies are auto-replayed from template declarations.
 #[contract_template("foo_storage")]
 #[aztec]
 pub contract FooStorageTemplate {
