@@ -8,6 +8,7 @@ use crate::{
         },
         compose_template::{
             compute_template_override_signatures,
+            function_name_key_from_ctstring,
             get_composed_templates_quoted,
             inject_template_functions_to_registries,
         },
@@ -38,7 +39,7 @@ use compute_note_hash_and_nullifier::generate_contract_library_methods_compute_n
 pub struct AztecConfig {
     custom_message_handler: Option<CustomMessageHandler<()>>,
     composed_templates: [Field],
-    template_overrides: [(Field, CtString)],
+    template_overrides: [(Field, Field)],
 }
 
 impl AztecConfig {
@@ -90,7 +91,10 @@ impl AztecConfig {
             composed_templates: _self.composed_templates,
             template_overrides: _self
                 .template_overrides
-                .push_back((template_registry::template_key(template_id), function_name)),
+                .push_back((
+                    template_registry::template_key(template_id),
+                    function_name_key_from_ctstring(function_name),
+                )),
         }
     }
 }
@@ -126,16 +130,18 @@ pub comptime fn aztec(m: Module, args: [AztecConfig]) -> Quoted {
         panic(f"#[aztec] expects 0 or 1 arguments, got {num_args}")
     };
 
-    let template_override_signatures = if config.template_overrides.len() > 0 {
-        Some(compute_template_override_signatures(
+    template_registry::register_composed_template_ids(m, config.composed_templates);
+
+    let template_override_signatures: Option<[(Field, Field)]> = if config.template_overrides.len() > 0 {
+        Option::some(compute_template_override_signatures(
             m,
             config.composed_templates,
             config.template_overrides,
         ))
     } else if config.composed_templates.len() > 0 {
-        Some(@[])
+        Option::some(@[])
     } else {
-        None
+        Option::none()
     };
 
     // If contract templates are enabled, populate the host's composed registries with the

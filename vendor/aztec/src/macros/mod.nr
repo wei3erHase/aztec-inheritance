@@ -28,7 +28,7 @@ use internals_functions_generation::{
 };
 use utils::is_fn_contract_library_method;
 
-fn function_signature_key(f: FunctionDefinition) -> Field {
+comptime fn function_signature_key(f: FunctionDefinition) -> Field {
     crate::macros::utils::compute_fn_selector(f.name(), f.parameters())
 }
 
@@ -49,6 +49,21 @@ comptime fn generate_contract_library_method_quote(f: FunctionDefinition) -> Quo
         #[contract_library_method]
         $visibility $unconstrained_kw fn $name($parameters)$return_clause {
             $function_ref($arguments)
+        }
+    }
+}
+
+comptime fn quote_event_struct(event_struct: TypeDefinition) -> Quoted {
+    let struct_name = event_struct.name();
+    let fields = event_struct.fields_as_written().map(|field| {
+        let (name, typ, _) = field;
+        quote { $name: $typ }
+    }).join(quote {,});
+
+    quote {
+        #[aztec::macros::events::event]
+        struct $struct_name {
+            $fields
         }
     }
 }
@@ -120,15 +135,29 @@ pub comptime fn contract_template(m: Module, template_id: CtString) -> Quoted {
         .map(|f| generate_contract_library_method_quote(f))
         .join(quote {});
 
-    let all_non_external_functions = quote {
+    let all_functions = quote {
         $priv_internal_wrappers
         $pub_internal_wrappers
-        $contract_library_methods
     };
+
+    let private_abi_exports = private_fns.map(|f| create_fn_abi_export(f)).join(quote {});
+    let public_abi_exports = public_fns.map(|f| create_fn_abi_export(f)).join(quote {});
+    let utility_abi_exports = utility_fns.map(|f| create_fn_abi_export(f)).join(quote {});
+    let all_abi_exports = quote {
+        $private_abi_exports
+        $public_abi_exports
+        $utility_abi_exports
+    };
+
+    let template_events =
+        m.structs().filter(|s| s.has_named_attribute("event")).map(|s| quote_event_struct(s)).join(quote {});
 
     template_registry::register_template(
         template_id,
-        all_non_external_functions,
+        all_functions,
+        all_abi_exports,
+        contract_library_methods,
+        template_events,
         m,
     );
     quote {}
