@@ -1,0 +1,14 @@
+[package]
+name = "composition_collision_fail_contract"
+type = "contract"
+authors = ["Wonderland"]
+compiler_version = ">=1.0.0"
+
+# Poison package: this contract is EXPECTED to fail compilation.
+# Hypothesis: composing two templates that expose a function with the same name
+# causes a compile error (no override/virtual -- collision is fatal).
+# Status: KNOWN_GAP -- Aztec compose has no override mechanism.
+
+[dependencies]
+aztec = { path = "../../vendor/aztec" }
+composition_fixtures = { path = "../composition_fixtures" }
