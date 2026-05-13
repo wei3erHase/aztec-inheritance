@@ -1,4 +1,4 @@
-use crate::{test::utils, MultiComposeHost};
+use crate::{MultiComposeHost, test::utils};
 
 #[test]
 unconstrained fn can_expose_two_direct_templates_in_one_host() {

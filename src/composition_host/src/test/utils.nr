@@ -1,14 +1,9 @@
-use aztec::{
-    protocol::address::AztecAddress,
-    test::helpers::test_environment::TestEnvironment,
-};
+use aztec::{protocol::address::AztecAddress, test::helpers::test_environment::TestEnvironment};
 
 pub unconstrained fn setup() -> (TestEnvironment, AztecAddress, AztecAddress) {
     let mut env = TestEnvironment::new();
     let caller = env.create_light_account();
-    let host = env
-        .deploy("@composition_host_contract/FooStorageHost")
-        .without_initializer();
+    let host = env.deploy("@composition_host_contract/FooStorageHost").without_initializer();
 
     (env, caller, host)
 }

@@ -1,10 +1,10 @@
+use crate::Amm;
 use aztec::{
     oracle::random::random,
     protocol::{address::AztecAddress, traits::FromField},
     test::helpers::test_environment::TestEnvironment,
 };
 use std::test::OracleMock;
-use crate::Amm;
 
 pub unconstrained fn setup() -> (TestEnvironment, AztecAddress, AztecAddress, AztecAddress, AztecAddress) {
     let mut env = TestEnvironment::new();
@@ -32,7 +32,10 @@ pub unconstrained fn deploy_amm_token(
         "LP\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0",
         18,
     );
-    env.deploy("@amm_token_contract/Amm").with_public_initializer(deployer, initializer_call_interface)
+    env.deploy("@amm_token_contract/Amm").with_public_initializer(
+        deployer,
+        initializer_call_interface,
+    )
 }
 
 pub unconstrained fn mock_note_randomness() {

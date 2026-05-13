@@ -1,4 +1,4 @@
-use crate::{test::utils, FooStorageHost};
+use crate::{FooStorageHost, test::utils};
 
 /// Composed external functions from the template are directly callable on the host.
 #[test]

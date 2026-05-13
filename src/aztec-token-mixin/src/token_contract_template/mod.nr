@@ -17,6 +17,7 @@ use aztec::macros::{aztec, contract_template};
 #[contract_template("aip20_token")]
 #[aztec]
 pub contract TokenContractTemplate {
+    use crate::token_init_params::TokenInitParams;
     use aztec::{
         macros::{
             events::event,
@@ -27,10 +28,9 @@ pub contract TokenContractTemplate {
         protocol::{address::AztecAddress, traits::{FromField, ToField}},
         state_vars::{Map, Owned, PublicImmutable, PublicMutable, StateVariable},
     };
-    use uint_note::{PartialUintNote, UintNote};
-    use compressed_string::FieldCompressedString;
     use balance_set::BalanceSet;
-    use crate::token_init_params::TokenInitParams;
+    use compressed_string::FieldCompressedString;
+    use uint_note::{PartialUintNote, UintNote};
 
     #[event]
     struct Transfer {
@@ -268,10 +268,7 @@ pub contract TokenContractTemplate {
     /// @notice Mints tokens to a private balance
     #[external("private")]
     fn mint_to_private(to: AztecAddress, amount: u128) {
-        _validate_minter(
-            self.msg_sender(),
-            self.storage.minter.read(),
-        );
+        _validate_minter(self.msg_sender(), self.storage.minter.read());
 
         self.internal._mint_to_private(to, amount);
     }
@@ -279,10 +276,7 @@ pub contract TokenContractTemplate {
     /// @notice Mints tokens to an address publicly
     #[external("public")]
     fn mint_to_public(to: AztecAddress, amount: u128) {
-        _validate_minter(
-            self.msg_sender(),
-            self.storage.minter.read(),
-        );
+        _validate_minter(self.msg_sender(), self.storage.minter.read());
 
         self.internal._mint_to_public(to, amount);
     }
@@ -299,11 +293,9 @@ pub contract TokenContractTemplate {
             amount,
         );
 
-        self.emit(Transfer {
-            from: AztecAddress::zero(),
-            to: _private_address_magic_value(),
-            amount,
-        });
+        self.emit(
+            Transfer { from: AztecAddress::zero(), to: _private_address_magic_value(), amount },
+        );
     }
 
     /// @notice Internal function to increase the total supply by amount
@@ -312,11 +304,9 @@ pub contract TokenContractTemplate {
     fn increase_total_supply_internal(amount: u128) {
         self.internal._increase_total_supply(amount);
 
-        self.emit(Transfer {
-            from: AztecAddress::zero(),
-            to: _private_address_magic_value(),
-            amount,
-        });
+        self.emit(
+            Transfer { from: AztecAddress::zero(), to: _private_address_magic_value(), amount },
+        );
     }
 
     /** ==========================================================
@@ -343,11 +333,9 @@ pub contract TokenContractTemplate {
     fn decrease_total_supply_internal(amount: u128) {
         self.internal._decrease_total_supply(amount);
 
-        self.emit(Transfer {
-            from: _private_address_magic_value(),
-            to: AztecAddress::zero(),
-            amount,
-        });
+        self.emit(
+            Transfer { from: _private_address_magic_value(), to: AztecAddress::zero(), amount },
+        );
     }
 
     /** ==========================================================
@@ -360,12 +348,12 @@ pub contract TokenContractTemplate {
     /// The host is responsible for setting `params.minter` to the appropriate address.
     #[internal("public")]
     fn _initialize_token(params: TokenInitParams) {
-        self.storage.name.initialize(
-            compressed_string::FieldCompressedString::from_string(params.name),
-        );
-        self.storage.symbol.initialize(
-            compressed_string::FieldCompressedString::from_string(params.symbol),
-        );
+        self.storage.name.initialize(compressed_string::FieldCompressedString::from_string(
+            params.name,
+        ));
+        self.storage.symbol.initialize(compressed_string::FieldCompressedString::from_string(
+            params.symbol,
+        ));
         self.storage.decimals.initialize(params.decimals);
         self.storage.minter.initialize(params.minter);
     }

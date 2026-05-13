@@ -1,4 +1,4 @@
-use aztec::macros::{AztecConfig, aztec, contract_template};
+use aztec::macros::{aztec, AztecConfig, contract_template};
 
 /// Template that composes other templates via #[aztec(...)] compose.
 ///

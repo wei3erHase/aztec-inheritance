@@ -13,7 +13,7 @@
 
 pub mod test;
 
-use aztec::macros::{AztecConfig, aztec};
+use aztec::macros::{aztec, AztecConfig};
 
 #[aztec(AztecConfig::new().compose("aip20_token"))]
 pub contract Amm {
@@ -26,9 +26,9 @@ pub contract Amm {
         protocol::address::AztecAddress,
         state_vars::{Map, Owned, PublicImmutable, PublicMutable, StateVariable},
     };
-    use compressed_string::FieldCompressedString;
-    use balance_set::BalanceSet;
     use aztec_token_mixin::TokenInitParams;
+    use balance_set::BalanceSet;
+    use compressed_string::FieldCompressedString;
     // FromField is required by the token functions injected via template composition.
     // It appears unused to the compiler (Amm's own code does not reference it directly)
     // but is needed to bring the from_field trait method into scope for generated bodies.
@@ -71,12 +71,9 @@ pub contract Amm {
         symbol: str<31>,
         decimals: u8,
     ) {
-        self.internal._initialize_token(TokenInitParams {
-            name,
-            symbol,
-            decimals,
-            minter: self.context.this_address(),
-        });
+        self.internal._initialize_token(
+            TokenInitParams { name, symbol, decimals, minter: self.context.this_address() },
+        );
         self.storage.token_a.initialize(token_a);
         self.storage.token_b.initialize(token_b);
     }

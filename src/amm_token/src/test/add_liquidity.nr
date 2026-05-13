@@ -1,4 +1,4 @@
-use crate::{test::utils, Amm};
+use crate::{Amm, test::utils};
 
 // SC-3: add_liquidity should mint LP shares through the composed token internals.
 #[test]

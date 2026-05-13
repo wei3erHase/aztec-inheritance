@@ -1,6 +1,6 @@
 pub mod test;
 
-use aztec::macros::{AztecConfig, aztec};
+use aztec::macros::{aztec, AztecConfig};
 
 /// Host contract that composes the foo_storage template.
 /// Tests: storage composition, event emission, internal reuse, library method migration.
@@ -13,11 +13,7 @@ use aztec::macros::{AztecConfig, aztec};
 #[aztec(AztecConfig::new().compose("foo_storage"))]
 pub contract FooStorageHost {
     use aztec::{
-        macros::{
-            events::event,
-            functions::{external, view},
-            storage::storage,
-        },
+        macros::{events::event, functions::{external, view}, storage::storage},
         state_vars::PublicMutable,
     };
 

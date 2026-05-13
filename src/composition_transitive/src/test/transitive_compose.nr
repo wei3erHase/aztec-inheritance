@@ -12,7 +12,9 @@ unconstrained fn transitive_root_template_is_available() {
 unconstrained fn transitive_composition_of_templates_is_not_flattened() {
     let (env, caller, host_address) = utils::setup();
 
-    let foo_selector = comptime { aztec::protocol::abis::function_selector::FunctionSelector::from_signature("foo_value()") };
+    let foo_selector = comptime {
+        aztec::protocol::abis::function_selector::FunctionSelector::from_signature("foo_value()")
+    };
     let _ = env.call_public(
         caller,
         aztec::context::calls::PublicCall::<9, 0, ()>::new(

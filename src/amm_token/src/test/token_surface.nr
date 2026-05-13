@@ -1,4 +1,4 @@
-use crate::{test::utils, Amm};
+use crate::{Amm, test::utils};
 
 // Minimal surface check: composed token views should exist and reflect constructor state.
 #[test]

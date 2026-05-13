@@ -1,6 +1,6 @@
 pub mod test;
 
-use aztec::macros::{AztecConfig, aztec};
+use aztec::macros::{aztec, AztecConfig};
 
 #[aztec(AztecConfig::new().compose("foo_template").compose("bar_template"))]
 pub contract MultiComposeHost {
