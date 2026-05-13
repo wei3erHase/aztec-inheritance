@@ -49,10 +49,17 @@ One sentence.
 1. ...
 2. ...
 
+## Poison patterns
+For each constraint the feature introduces or removes, update `src/poison/`:
+- **New constraint** (something that should now fail to compile): add a pattern under `src/poison/<name>/` with `expected_error.txt`.
+- **Constraint lifted** (feature solves a previously-poisoned case): remove or reclassify the pattern.
+- **No change**: state explicitly why no pattern is added or removed.
+
 ## Acceptance criteria
 - [ ] nargo check passes
 - [ ] new test proves the behavior
 - [ ] related docs updated
+- [ ] poison patterns added/removed/confirmed unchanged
 - [ ] open questions answered in PR discussion
 ```
 

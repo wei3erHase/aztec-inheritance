@@ -1,0 +1,19 @@
+[package]
+name = "collision_no_override"
+type = "contract"
+authors = ["Wonderland"]
+compiler_version = ">=1.0.0"
+
+# Poison package: EXPECTED to fail compilation.
+#
+# Two templates both expose a function with the same name (foo_value).
+# Without a virtual/override mechanism, name collision is a fatal error:
+# two __aztec_nr_internals__foo_value wrappers would be injected, which
+# is a redefinition.
+#
+# Expected failure: duplicate function definition or "cannot compose"
+# collision error from the aztec macro.
+
+[dependencies]
+aztec = { path = "../../../vendor/aztec" }
+composition_fixtures = { path = "../../composition_fixtures" }
