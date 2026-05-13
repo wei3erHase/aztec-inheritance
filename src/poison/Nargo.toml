@@ -1,0 +1,9 @@
+[workspace]
+members = [
+  "missing_storage_var",
+  "collision_no_override",
+]
+
+# Poison workspace: packages expected to FAIL compilation.
+# Do NOT add these to the root workspace members.
+# Run via: scripts/test-poison-patterns.sh

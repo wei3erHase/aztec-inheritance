@@ -1,0 +1,26 @@
+name: Poison Patterns
+
+# Verifies that each package in src/poison/ fails compilation with the
+# expected error. Runs in parallel with the main PR checks workflow.
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  poison-patterns:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Aztec environment
+        uses: defi-wonderland/aztec-ci-actions/actions/setup-aztec@v0
+        with:
+          start-pxe: "false"
+          run-codegen: "false"
+
+      - name: Run poison pattern tests
+        run: ./scripts/test-poison-patterns.sh

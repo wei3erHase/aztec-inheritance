@@ -185,3 +185,18 @@ in `Nargo.toml`. They exist in `src/` as documentation and manual test evidence.
 nargo check --package composition_collision_fail_contract
 # Expected: "Public function selector collision detected"
 ```
+
+---
+
+## G-4: Storage field injection blocked on Noir upstream
+
+**Gap:** Host must manually declare every storage field referenced by composed function bodies.
+Templates cannot inject fields automatically.
+
+**Blocker:** `TypeDefinition::add_field` does not exist in the Noir comptime API. This is a
+language-level change that must be contributed upstream.
+
+**Status:** Blocked. Aztec-side design is documented in `docs/05-future-work.md` under
+"Possibilities with Noir support". No Noir issue filed yet.
+
+**Upstream issue:** TBD -- to be filed against https://github.com/noir-lang/noir
