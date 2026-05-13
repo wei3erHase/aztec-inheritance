@@ -1,0 +1,16 @@
+# Cloned repos — tracked separately, not submodules
+repos/
+
+# Build artifacts
+target/
+codegenCache.json
+*.json.bak
+
+# Node
+node_modules/
+
+# Env
+.env
+.env.local
+
+.roadmap_status.md
