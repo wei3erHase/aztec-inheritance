@@ -1,0 +1,35 @@
+name: Noir tests
+
+on:
+  push:
+    branches:
+      - dev
+  pull_request:
+
+jobs:
+  noir:
+    name: Noir tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Aztec toolchain
+        run: |
+          curl -fsSL "https://install.aztec.network/${AZTEC_VERSION}" | VERSION="${AZTEC_VERSION}" bash -s
+          echo "$HOME/.aztec/bin" >> "$GITHUB_PATH"
+        env:
+          AZTEC_VERSION: 4.2.0
+
+      - name: Verify toolchain
+        run: |
+          aztec --version
+          nargo --version
+
+      - name: Noir checks
+        run: |
+          nargo check
+          aztec test --no-fuzz
