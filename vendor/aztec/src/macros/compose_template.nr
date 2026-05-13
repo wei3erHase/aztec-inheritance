@@ -21,12 +21,13 @@ use crate::macros::{
 };
 
 comptime fn contains_field(values: [Field], value: Field) -> bool {
+    let mut found = false;
     for existing in values {
         if existing == value {
-            return true;
+            found = true;
         }
     }
-    false
+    found
 }
 
 // Returns all template ids reachable from `template_keys`, preserving first-seen order and
@@ -43,15 +44,26 @@ comptime fn flatten_template_keys(template_keys: [Field]) -> [Field] {
             template_module_opt.is_some(),
             "compose: no contract template registered for one of the requested template ids",
         );
+        let template_module = template_module_opt.unwrap();
 
         if !contains_field(processed, template_key) {
             processed = processed.push_back(template_key);
 
-            if let Some(composed_keys) = template_registry::get_template_composed_keys(template_key) {
-                for child_key in composed_keys {
-                    if !contains_field(processed, child_key) {
-                        pending = pending.push_back(child_key);
-                    }
+            let composed_keys_opt = template_registry::get_template_composed_keys(template_key);
+            let mut child_template_keys = if composed_keys_opt.is_some() {
+                composed_keys_opt.unwrap()
+            } else {
+                let module_composed_keys_opt = template_registry::get_template_composed_keys_by_module(template_module);
+                if module_composed_keys_opt.is_some() {
+                    module_composed_keys_opt.unwrap()
+                } else {
+                    @[]
+                }
+            };
+
+            for child_key in child_template_keys {
+                if !contains_field(processed, child_key) {
+                    pending = pending.push_back(child_key);
                 }
             }
         }
@@ -126,10 +138,10 @@ pub(crate) comptime fn get_composed_templates_quoted(
         let abi_exports_opt = template_registry::get_template_abi_exports(template_key);
         let contract_library_methods_opt = template_registry::get_template_contract_library_methods(template_key);
 
-        let functions = if functions_opt.is_some() { functions_opt.unwrap() } else { @[] };
-        let abi_exports = if abi_exports_opt.is_some() { abi_exports_opt.unwrap() } else { @[] };
+        let functions = if functions_opt.is_some() { functions_opt.unwrap() } else { quote {} };
+        let abi_exports = if abi_exports_opt.is_some() { abi_exports_opt.unwrap() } else { quote {} };
         let contract_library_methods =
-            if contract_library_methods_opt.is_some() { contract_library_methods_opt.unwrap() } else { @[] };
+            if contract_library_methods_opt.is_some() { contract_library_methods_opt.unwrap() } else { quote {} };
 
         all_functions = quote { $all_functions $contract_library_methods $functions };
         all_abi_exports = quote { $all_abi_exports $abi_exports };
