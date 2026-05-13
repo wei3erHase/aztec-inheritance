@@ -29,17 +29,17 @@ proof (pass/fail). Zero hypotheses unresolved.
 | 7 | Constructor/initializer chain | PASS | `amm_token`: constructor calls `self.internal._initialize_token(TokenInitParams {...})` | **IMPLEMENTED** |
 | 8 | Composing a transitive template does not silently flatten grandchild functions | SILENT FAIL | `composition_transitive`: `foo_value()` silently absent; no compiler warning | **KNOWN_GAP** |
 | 9 | Function name collision is a hard compile error | PASS | `composition_collision_fail`: "selector collision between foo_value and foo_value" at dispatch generation | **IMPLEMENTED** |
-| 10 | Host can override a specific template function | NOT YET | No override mechanism; collision is fatal today | **PLANNED_CHANGE** |
+| 10 | Host can override a specific template function | PASS | `composition_override`: `fee_bps()` is implemented in host and overrides template default | **IMPLEMENTED** |
 | 11 | `super` call to base implementation | N/A | Compose is flat/non-hierarchical; there is no base, no chain, no `super` concept | **OUT_OF_SCOPE** |
 | 12 | Global names in composed bodies resolve in host scope | PASS (with pattern) | Host declares or imports `FOO_MAGIC`; injected body resolves it. Template must not self-reference its own module globals -- use `#[contract_library_method]` for template-owned constants | **IMPLEMENTED** |
 | 13 | Event structs auto-injected into host from template | FAIL | Host must re-declare every event struct used in composed bodies; language-blocked | **KNOWN_GAP** |
 | 14 | Host declares all template storage fields manually | PASS (by design) | Host fully owns its storage; templates have no private storage and should not reference slots by id | **BY_DESIGN** |
 | 15 | Storage slot ordering is host-controlled | PASS (by design) | `storage.nr` assigns slots per `fields_as_written()` order in host's Storage struct | **BY_DESIGN** |
-| 16 | Abstract template (all-virtual, not deployable) | NOT YET | Implementable alongside #10: a template with only virtual functions is abstract by convention | **PLANNED_CHANGE** |
+| 16 | Abstract template (all-virtual, not deployable) | PASS (convention) | `composition_fixtures::virtual_template` documents virtual-only external surface for override-based instantiation | **IMPLEMENTED** |
 | 17 | `private` function inaccessible to host (Solidity visibility) | N/A | Compose copies quoted function bodies, not Solidity-style imports. There is no private scope in the copy model -- all composed functions are visible to the host | **OUT_OF_SCOPE** |
 | 18 | Inheritable/overridable modifiers | N/A | Aztec uses function-level attributes (`#[only_self]`, `#[authorize_once]`); no modifier chain | **OUT_OF_SCOPE** |
 
-**Summary: 9 IMPLEMENTED, 2 PLANNED_CHANGE, 3 KNOWN_GAP, 2 BY_DESIGN, 3 OUT_OF_SCOPE, 0 UNRESOLVED**
+**Summary: 11 IMPLEMENTED, 0 PLANNED_CHANGE, 3 KNOWN_GAP, 2 BY_DESIGN, 3 OUT_OF_SCOPE, 0 UNRESOLVED**
 
 ---
 
@@ -77,7 +77,7 @@ pub global FOO_MAGIC: u32 = 99;
 
 See [docs/04-template-authoring.md](04-template-authoring.md) for the full pattern.
 
-### #10 and #16 -- planned together
+### #10 and #16 -- implemented together
 
 Virtual/override (#10) and abstract templates (#16) are two sides of the same mechanism. A template
 with all-virtual functions is abstract by convention. Implementing #10 automatically enables #16.
@@ -89,11 +89,12 @@ See [docs/05-future-work.md](05-future-work.md) M4 for the design.
 
 | Package | Path | Proves |
 |---|---|---|
-| `composition_fixtures` | `src/composition_fixtures` | Template definitions: `foo_template`, `bar_template`, `mid_template`, `foo_storage_template`, `foo_collision_template` |
+| `composition_fixtures` | `src/composition_fixtures` | Template definitions: `foo_template`, `bar_template`, `mid_template`, `foo_storage_template`, `foo_collision_template`, `virtual_template` |
 | `composition_multi` | `src/composition_multi` | #1, #2, #3, #9 |
 | `composition_transitive` | `src/composition_transitive` | #8 |
 | `composition_host` | `src/composition_host` | #4, #5, #6, #12, #13 |
 | `composition_collision_fail` | `src/composition_collision_fail` | #9 (poison -- excluded from workspace) |
+| `composition_override` | `src/composition_override` | #10, #16 (virtual override and template-overridable composition) |
 | `amm_token` | `src/amm_token` | #7, #14 |
 
 ---
@@ -109,8 +110,8 @@ Aztec template composition is **merge-and-replay**, not Solidity `is`-based inhe
 | Library method constants cross-crate | Yes |
 | Host-parameterizable globals (host provides binding) | Yes, with pattern |
 | Name collision detection (hard error) | Yes |
-| Virtual/override single function | Planned (M4) |
-| Abstract templates | Planned (M4, follows from virtual/override) |
+| Virtual/override single function | Yes (`#10`) |
+| Abstract templates | Yes (`#16`; convention now documented) |
 | Transitive template flattening | No (accepted; warn on silent skip is planned) |
 | Automatic event struct injection | No (language-blocked) |
 

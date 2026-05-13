@@ -1,0 +1,9 @@
+[package]
+name = "composition_override_contract"
+type = "contract"
+authors = ["Wonderland"]
+compiler_version = ">=1.0.0"
+
+[dependencies]
+aztec = { path = "../../vendor/aztec" }
+composition_fixtures = { path = "../composition_fixtures" }
