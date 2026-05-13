@@ -15,8 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Aztec environment
         uses: defi-wonderland/aztec-ci-actions/actions/setup-aztec@v0

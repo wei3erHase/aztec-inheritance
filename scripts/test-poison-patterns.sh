@@ -32,8 +32,10 @@ backup_file=""
 
 patch_workspace() {
     local rel_path="$1"
-    backup_file=$(mktemp)
-    cp "$ROOT_NARGO" "$backup_file"
+    local tmp
+    tmp=$(mktemp)
+    cp "$ROOT_NARGO" "$tmp"
+    backup_file="$tmp"  # only set after cp succeeds; trap is a no-op if cp fails
     python3 - "$ROOT_NARGO" "$rel_path" << 'PY'
 import sys, re
 path, rel = sys.argv[1], sys.argv[2]
