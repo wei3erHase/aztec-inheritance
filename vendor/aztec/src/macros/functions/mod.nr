@@ -137,11 +137,6 @@ pub comptime fn noinitcheck(f: FunctionDefinition) {
     }
 }
 
-/// Marks a function as virtual for template composition override checks.
-pub comptime fn template_virtual(_f: FunctionDefinition) {
-    // Marker attribute: no codegen behavior is required here.
-}
-
 /// An `allow_phase_change` function will allow transitioning from the non-revertible to the revertible phase
 /// during its execution.
 ///

@@ -12,16 +12,6 @@ comptime mut global TEMPLATE_FUNCTIONS_QUOTED: CHashMap<Field, Quoted> = CHashMa
 comptime mut global TEMPLATE_ABI_EXPORTS_QUOTED: CHashMap<Field, Quoted> = CHashMap::new();
 comptime mut global TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED: CHashMap<Field, Quoted> = CHashMap::new();
 
-// Optional per-function storage for selective replay/filtering.
-comptime mut global TEMPLATE_FUNCTIONS_QUOTED_BY_KEY: CHashMap<Field, [(Field, Quoted)]> = CHashMap::new();
-comptime mut global TEMPLATE_ABI_EXPORTS_QUOTED_BY_KEY: CHashMap<Field, [(Field, Quoted)]> = CHashMap::new();
-comptime mut global TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED_BY_KEY: CHashMap<Field, [(Field, Quoted)]> =
-    CHashMap::new();
-
-// Template-wide metadata for override validation and filtering.
-comptime mut global TEMPLATE_VIRTUAL_FUNCTION_KEYS: CHashMap<Field, [Field]> = CHashMap::new();
-comptime mut global TEMPLATE_FUNCTION_KEYS: CHashMap<Field, [Field]> = CHashMap::new();
-
 comptime mut global TEMPLATE_MODULES: CHashMap<Field, Module> = CHashMap::new();
 
 // Maps a template key to the list of template keys it directly composes.
@@ -36,14 +26,6 @@ comptime mut global TEMPLATE_KEY_BY_MODULE: CHashMap<Module, Field> = CHashMap::
 pub(crate) comptime fn template_key(template_id: CtString) -> Field {
     let template_id_str: str<_> = template_id.as_quoted_str!();
     hash_str(template_id_str)
-}
-
-pub(crate) comptime fn string_key(value: CtString) -> Field {
-    hash_str(value.as_quoted_str!())
-}
-
-pub(crate) comptime fn function_name_key(function_name: Quoted) -> Field {
-    hash_str(f"{function_name}".as_quoted_str!())
 }
 
 comptime fn hash_str(value: str<_>) -> Field {
@@ -61,21 +43,11 @@ pub(crate) comptime fn register_template(
     abi_exports: Quoted,
     contract_library_methods: Quoted,
     m: Module,
-    functions_by_key: [(Field, Quoted)],
-    abi_exports_by_key: [(Field, Quoted)],
-    contract_library_methods_by_key: [(Field, Quoted)],
-    virtual_function_keys: [Field],
-    function_keys: [Field],
 ) {
     let t_key = template_key(template_id);
     TEMPLATE_FUNCTIONS_QUOTED.insert(t_key, functions);
     TEMPLATE_ABI_EXPORTS_QUOTED.insert(t_key, abi_exports);
     TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED.insert(t_key, contract_library_methods);
-    TEMPLATE_FUNCTIONS_QUOTED_BY_KEY.insert(t_key, functions_by_key);
-    TEMPLATE_ABI_EXPORTS_QUOTED_BY_KEY.insert(t_key, abi_exports_by_key);
-    TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED_BY_KEY.insert(t_key, contract_library_methods_by_key);
-    TEMPLATE_VIRTUAL_FUNCTION_KEYS.insert(t_key, virtual_function_keys);
-    TEMPLATE_FUNCTION_KEYS.insert(t_key, function_keys);
     TEMPLATE_MODULES.insert(t_key, m);
     TEMPLATE_KEY_BY_MODULE.insert(m, t_key);
 }
@@ -90,28 +62,6 @@ pub(crate) comptime fn get_template_abi_exports(template_key: Field) -> Option<Q
 
 pub(crate) comptime fn get_template_contract_library_methods(template_key: Field) -> Option<Quoted> {
     TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED.get(template_key)
-}
-
-pub(crate) comptime fn get_template_functions_by_key(template_key: Field) -> Option<[(Field, Quoted)]> {
-    TEMPLATE_FUNCTIONS_QUOTED_BY_KEY.get(template_key)
-}
-
-pub(crate) comptime fn get_template_abi_exports_by_key(template_key: Field) -> Option<[(Field, Quoted)]> {
-    TEMPLATE_ABI_EXPORTS_QUOTED_BY_KEY.get(template_key)
-}
-
-pub(crate) comptime fn get_template_contract_library_methods_by_key(
-    template_key: Field,
-) -> Option<[(Field, Quoted)]> {
-    TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED_BY_KEY.get(template_key)
-}
-
-pub(crate) comptime fn get_template_virtual_function_keys(template_key: Field) -> Option<[Field]> {
-    TEMPLATE_VIRTUAL_FUNCTION_KEYS.get(template_key)
-}
-
-pub(crate) comptime fn get_template_function_keys(template_key: Field) -> Option<[Field]> {
-    TEMPLATE_FUNCTION_KEYS.get(template_key)
 }
 
 pub(crate) comptime fn get_template_module(template_key: Field) -> Option<Module> {

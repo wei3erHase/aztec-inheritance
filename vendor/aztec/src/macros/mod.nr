@@ -49,15 +49,6 @@ comptime fn generate_contract_library_method_quote(f: FunctionDefinition) -> Quo
     }
 }
 
-comptime fn contains_field(values: [Field], value: Field) -> bool {
-    for existing in values {
-        if existing == value {
-            return true;
-        }
-    }
-    false
-}
-
 /// Registers a contract module as a named composition template.
 ///
 /// Apply this attribute to any template contract so that
@@ -78,150 +69,55 @@ pub comptime fn contract_template(m: Module, template_id: CtString) -> Quoted {
     let pub_internal_fns = internal_functions_registry::get_public_functions(m);
 
     let mut all_functions = quote {};
-    let mut functions_by_key: [(Field, Quoted)] = @[];
-    let mut all_function_keys: [Field] = @[];
-    let mut virtual_function_keys: [Field] = @[];
 
     for f in private_fns {
-        let key = template_registry::function_name_key(f.name());
         let generated = generate_private_external(f);
         all_functions = quote { $all_functions $generated };
-        functions_by_key = functions_by_key.push_back((key, generated));
-        all_function_keys = if contains_field(all_function_keys, key) {
-            all_function_keys
-        } else {
-            all_function_keys.push_back(key)
-        };
-        if f.has_named_attribute("template_virtual") {
-            virtual_function_keys = if contains_field(virtual_function_keys, key) {
-                virtual_function_keys
-            } else {
-                virtual_function_keys.push_back(key)
-            };
-        }
     }
 
     for f in public_fns {
-        let key = template_registry::function_name_key(f.name());
         let generated = generate_public_external(f);
         all_functions = quote { $all_functions $generated };
-        functions_by_key = functions_by_key.push_back((key, generated));
-        all_function_keys = if contains_field(all_function_keys, key) {
-            all_function_keys
-        } else {
-            all_function_keys.push_back(key)
-        };
-        if f.has_named_attribute("template_virtual") {
-            virtual_function_keys = if contains_field(virtual_function_keys, key) {
-                virtual_function_keys
-            } else {
-                virtual_function_keys.push_back(key)
-            };
-        }
     }
 
     for f in utility_fns {
-        let key = template_registry::function_name_key(f.name());
         let generated = generate_utility_external(f);
         all_functions = quote { $all_functions $generated };
-        functions_by_key = functions_by_key.push_back((key, generated));
-        all_function_keys = if contains_field(all_function_keys, key) {
-            all_function_keys
-        } else {
-            all_function_keys.push_back(key)
-        };
-        if f.has_named_attribute("template_virtual") {
-            virtual_function_keys = if contains_field(virtual_function_keys, key) {
-                virtual_function_keys
-            } else {
-                virtual_function_keys.push_back(key)
-            };
-        }
     }
 
     for f in priv_internal_fns {
-        let key = template_registry::function_name_key(f.name());
         let generated = generate_private_internal(f);
         all_functions = quote { $all_functions $generated };
-        functions_by_key = functions_by_key.push_back((key, generated));
-        all_function_keys = if contains_field(all_function_keys, key) {
-            all_function_keys
-        } else {
-            all_function_keys.push_back(key)
-        };
-        if f.has_named_attribute("template_virtual") {
-            virtual_function_keys = if contains_field(virtual_function_keys, key) {
-                virtual_function_keys
-            } else {
-                virtual_function_keys.push_back(key)
-            };
-        }
     }
 
     for f in pub_internal_fns {
-        let key = template_registry::function_name_key(f.name());
         let generated = generate_public_internal(f);
         all_functions = quote { $all_functions $generated };
-        functions_by_key = functions_by_key.push_back((key, generated));
-        all_function_keys = if contains_field(all_function_keys, key) {
-            all_function_keys
-        } else {
-            all_function_keys.push_back(key)
-        };
-        if f.has_named_attribute("template_virtual") {
-            virtual_function_keys = if contains_field(virtual_function_keys, key) {
-                virtual_function_keys
-            } else {
-                virtual_function_keys.push_back(key)
-            };
-        }
     }
 
     // Pre-generate ABI export structs.
     let mut all_abi_exports = quote {};
-    let mut abi_exports_by_key: [(Field, Quoted)] = @[];
 
     for f in private_fns {
-        let key = template_registry::function_name_key(f.name());
         let generated = create_fn_abi_export(f);
         all_abi_exports = quote { $all_abi_exports $generated };
-        abi_exports_by_key = abi_exports_by_key.push_back((key, generated));
     }
 
     for f in public_fns {
-        let key = template_registry::function_name_key(f.name());
         let generated = create_fn_abi_export(f);
         all_abi_exports = quote { $all_abi_exports $generated };
-        abi_exports_by_key = abi_exports_by_key.push_back((key, generated));
     }
 
     for f in utility_fns {
-        let key = template_registry::function_name_key(f.name());
         let generated = create_fn_abi_export(f);
         all_abi_exports = quote { $all_abi_exports $generated };
-        abi_exports_by_key = abi_exports_by_key.push_back((key, generated));
     }
 
     let mut all_contract_library_methods = quote {};
-    let mut contract_library_methods_by_key: [(Field, Quoted)] = @[];
 
     for f in m.functions().filter(|f| is_fn_contract_library_method(f)) {
-        let key = template_registry::function_name_key(f.name());
         let generated = generate_contract_library_method_quote(f);
         all_contract_library_methods = quote { $all_contract_library_methods $generated };
-        contract_library_methods_by_key = contract_library_methods_by_key.push_back((key, generated));
-        all_function_keys = if contains_field(all_function_keys, key) {
-            all_function_keys
-        } else {
-            all_function_keys.push_back(key)
-        };
-        if f.has_named_attribute("template_virtual") {
-            virtual_function_keys = if contains_field(virtual_function_keys, key) {
-                virtual_function_keys
-            } else {
-                virtual_function_keys.push_back(key)
-            };
-        }
     }
 
     template_registry::register_template(
@@ -230,11 +126,6 @@ pub comptime fn contract_template(m: Module, template_id: CtString) -> Quoted {
         all_abi_exports,
         all_contract_library_methods,
         m,
-        functions_by_key,
-        abi_exports_by_key,
-        contract_library_methods_by_key,
-        virtual_function_keys,
-        all_function_keys,
     );
     quote {}
 }

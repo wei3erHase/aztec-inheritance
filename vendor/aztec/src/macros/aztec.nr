@@ -16,7 +16,6 @@ use crate::{
     },
     messages::discovery::CustomMessageHandler,
 };
-use crate::utils::cmap::CHashMap;
 
 use compute_note_hash_and_nullifier::generate_contract_library_methods_compute_note_hash_and_nullifier;
 
@@ -35,7 +34,6 @@ use compute_note_hash_and_nullifier::generate_contract_library_methods_compute_n
 pub struct AztecConfig {
     custom_message_handler: Option<CustomMessageHandler<()>>,
     composed_templates: [Field],
-    template_overrides: CHashMap<Field, [Field]>,
 }
 
 impl AztecConfig {
@@ -47,7 +45,6 @@ impl AztecConfig {
         Self {
             custom_message_handler: Option::none(),
             composed_templates: @[],
-            template_overrides: CHashMap::new(),
         }
     }
 
@@ -62,7 +59,6 @@ impl AztecConfig {
         Self {
             custom_message_handler: Option::some(handler),
             composed_templates: _self.composed_templates,
-            template_overrides: _self.template_overrides,
         }
     }
 
@@ -77,48 +73,6 @@ impl AztecConfig {
             composed_templates: _self.composed_templates.push_back(
                 template_registry::template_key(template_id),
             ),
-            template_overrides: _self.template_overrides,
-        }
-    }
-
-    /// Declares that a template function can be overridden by host code.
-    ///
-    /// `template_id` must match the template identifier used in `compose`, and `function_name` must match a
-    /// function in that template marked as virtual.
-    pub comptime fn override_template(
-        _self: Self,
-        template_id: CtString,
-        function_name: CtString,
-    ) -> Self {
-        let template_key = template_registry::template_key(template_id);
-        let function_key = template_registry::string_key(function_name);
-
-        let mut existing_overrides = _self.template_overrides;
-        let existing = if existing_overrides.get(template_key).is_some() {
-            existing_overrides.get(template_key).unwrap()
-        } else {
-            @[]
-        };
-
-        let mut has_duplicate = false;
-        for override_key in existing {
-            if override_key == function_key {
-                has_duplicate = true;
-            }
-        }
-
-        let template_overrides = if has_duplicate {
-            existing
-        } else {
-            existing.push_back(function_key)
-        };
-
-        existing_overrides.insert(template_key, template_overrides);
-
-        Self {
-            custom_message_handler: _self.custom_message_handler,
-            composed_templates: _self.composed_templates,
-            template_overrides: existing_overrides,
         }
     }
 }
@@ -167,7 +121,7 @@ pub comptime fn aztec(m: Module, args: [AztecConfig]) -> Quoted {
     // If contract templates are enabled, populate the host's composed registries with the
     // selected templates' FunctionDefinitions so that interface/stub generators include them.
     if config.composed_templates.len() > 0 {
-        inject_template_functions_to_registries(m, config.composed_templates, config.template_overrides);
+        inject_template_functions_to_registries(m, config.composed_templates);
     }
 
     // Functions that don't have #[external(...)], #[contract_library_method], or #[test] are not allowed in contracts.
@@ -227,7 +181,7 @@ pub comptime fn aztec(m: Module, args: [AztecConfig]) -> Quoted {
 
     let (composed_functions, composed_abi_exports, composed_self_call_structs) =
         if config.composed_templates.len() > 0 {
-        get_composed_templates_quoted(config.composed_templates, config.template_overrides)
+        get_composed_templates_quoted(config.composed_templates)
     } else {
         (quote {}, quote {}, quote {})
     };
