@@ -1,0 +1,8 @@
+{
+  "name": "@defi-wonderland/aztec-mixins",
+  "version": "0.0.0",
+  "private": true,
+  "config": {
+    "aztecVersion": "4.2.0"
+  }
+}
