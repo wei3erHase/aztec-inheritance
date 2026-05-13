@@ -11,14 +11,46 @@ use crate::utils::cmap::CHashMap;
 comptime mut global TEMPLATE_FUNCTIONS_QUOTED: CHashMap<Field, Quoted> = CHashMap::new();
 comptime mut global TEMPLATE_ABI_EXPORTS_QUOTED: CHashMap<Field, Quoted> = CHashMap::new();
 comptime mut global TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED: CHashMap<Field, Quoted> = CHashMap::new();
+
+// Optional per-function storage for selective replay/filtering.
+comptime mut global TEMPLATE_FUNCTIONS_QUOTED_BY_KEY: CHashMap<Field, [(Field, Quoted)]> = CHashMap::new();
+comptime mut global TEMPLATE_ABI_EXPORTS_QUOTED_BY_KEY: CHashMap<Field, [(Field, Quoted)]> = CHashMap::new();
+comptime mut global TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED_BY_KEY: CHashMap<Field, [(Field, Quoted)]> =
+    CHashMap::new();
+
+// Template-wide metadata for override validation and filtering.
+comptime mut global TEMPLATE_VIRTUAL_FUNCTION_KEYS: CHashMap<Field, [Field]> = CHashMap::new();
+comptime mut global TEMPLATE_FUNCTION_KEYS: CHashMap<Field, [Field]> = CHashMap::new();
+
 comptime mut global TEMPLATE_MODULES: CHashMap<Field, Module> = CHashMap::new();
+
+// Maps a template key to the list of template keys it directly composes.
+// Populated by the aztec macro when a contract_template module itself composes other templates.
+comptime mut global TEMPLATE_COMPOSED_KEYS: CHashMap<Field, [Field]> = CHashMap::new();
+
+// Maps a Module to its template key.
+// Populated by contract_template so the aztec macro can determine whether the current module
+// is a registered template and store transitive composed-key relationships for it.
+comptime mut global TEMPLATE_KEY_BY_MODULE: CHashMap<Module, Field> = CHashMap::new();
 
 pub(crate) comptime fn template_key(template_id: CtString) -> Field {
     let template_id_str: str<_> = template_id.as_quoted_str!();
-    let template_id_bytes = template_id_str.as_bytes();
-    let mut acc: Field = template_id_bytes.len() as Field + 1;
-    for i in 0..template_id_bytes.len() {
-        acc = acc * 16777619 + template_id_bytes[i] as Field + 1;
+    hash_str(template_id_str)
+}
+
+pub(crate) comptime fn string_key(value: CtString) -> Field {
+    hash_str(value.as_quoted_str!())
+}
+
+pub(crate) comptime fn function_name_key(function_name: Quoted) -> Field {
+    hash_str(f"{function_name}".as_quoted_str!())
+}
+
+comptime fn hash_str(value: str<_>) -> Field {
+    let value_bytes = value.as_bytes();
+    let mut acc: Field = value_bytes.len() as Field + 1;
+    for i in 0..value_bytes.len() {
+        acc = acc * 16777619 + value_bytes[i] as Field + 1;
     }
     acc
 }
@@ -29,12 +61,23 @@ pub(crate) comptime fn register_template(
     abi_exports: Quoted,
     contract_library_methods: Quoted,
     m: Module,
+    functions_by_key: [(Field, Quoted)],
+    abi_exports_by_key: [(Field, Quoted)],
+    contract_library_methods_by_key: [(Field, Quoted)],
+    virtual_function_keys: [Field],
+    function_keys: [Field],
 ) {
-    let template_key = template_key(template_id);
-    TEMPLATE_FUNCTIONS_QUOTED.insert(template_key, functions);
-    TEMPLATE_ABI_EXPORTS_QUOTED.insert(template_key, abi_exports);
-    TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED.insert(template_key, contract_library_methods);
-    TEMPLATE_MODULES.insert(template_key, m);
+    let t_key = template_key(template_id);
+    TEMPLATE_FUNCTIONS_QUOTED.insert(t_key, functions);
+    TEMPLATE_ABI_EXPORTS_QUOTED.insert(t_key, abi_exports);
+    TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED.insert(t_key, contract_library_methods);
+    TEMPLATE_FUNCTIONS_QUOTED_BY_KEY.insert(t_key, functions_by_key);
+    TEMPLATE_ABI_EXPORTS_QUOTED_BY_KEY.insert(t_key, abi_exports_by_key);
+    TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED_BY_KEY.insert(t_key, contract_library_methods_by_key);
+    TEMPLATE_VIRTUAL_FUNCTION_KEYS.insert(t_key, virtual_function_keys);
+    TEMPLATE_FUNCTION_KEYS.insert(t_key, function_keys);
+    TEMPLATE_MODULES.insert(t_key, m);
+    TEMPLATE_KEY_BY_MODULE.insert(m, t_key);
 }
 
 pub(crate) comptime fn get_template_functions(template_key: Field) -> Option<Quoted> {
@@ -49,6 +92,43 @@ pub(crate) comptime fn get_template_contract_library_methods(template_key: Field
     TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED.get(template_key)
 }
 
+pub(crate) comptime fn get_template_functions_by_key(template_key: Field) -> Option<[(Field, Quoted)]> {
+    TEMPLATE_FUNCTIONS_QUOTED_BY_KEY.get(template_key)
+}
+
+pub(crate) comptime fn get_template_abi_exports_by_key(template_key: Field) -> Option<[(Field, Quoted)]> {
+    TEMPLATE_ABI_EXPORTS_QUOTED_BY_KEY.get(template_key)
+}
+
+pub(crate) comptime fn get_template_contract_library_methods_by_key(
+    template_key: Field,
+) -> Option<[(Field, Quoted)]> {
+    TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED_BY_KEY.get(template_key)
+}
+
+pub(crate) comptime fn get_template_virtual_function_keys(template_key: Field) -> Option<[Field]> {
+    TEMPLATE_VIRTUAL_FUNCTION_KEYS.get(template_key)
+}
+
+pub(crate) comptime fn get_template_function_keys(template_key: Field) -> Option<[Field]> {
+    TEMPLATE_FUNCTION_KEYS.get(template_key)
+}
+
 pub(crate) comptime fn get_template_module(template_key: Field) -> Option<Module> {
     TEMPLATE_MODULES.get(template_key)
+}
+
+/// Returns the template key for a given module, if that module was registered as a template.
+pub(crate) comptime fn get_template_key_by_module(m: Module) -> Option<Field> {
+    TEMPLATE_KEY_BY_MODULE.get(m)
+}
+
+/// Stores the list of template keys directly composed by a given template.
+pub(crate) comptime fn register_template_composed_keys(t_key: Field, composed_keys: [Field]) {
+    TEMPLATE_COMPOSED_KEYS.insert(t_key, composed_keys);
+}
+
+/// Returns the list of template keys directly composed by the given template, if any.
+pub(crate) comptime fn get_template_composed_keys(t_key: Field) -> Option<[Field]> {
+    TEMPLATE_COMPOSED_KEYS.get(t_key)
 }
