@@ -28,12 +28,12 @@ FAIL=0
 
 # --- Workspace patch helpers -------------------------------------------------
 
-original_nargo=""
+backup_file=""
 
 patch_workspace() {
     local rel_path="$1"
-    original_nargo=$(cat "$ROOT_NARGO")
-    # Insert the path as the first member so it's easy to remove
+    backup_file=$(mktemp)
+    cp "$ROOT_NARGO" "$backup_file"
     python3 - "$ROOT_NARGO" "$rel_path" << 'PY'
 import sys, re
 path, rel = sys.argv[1], sys.argv[2]
@@ -44,9 +44,10 @@ PY
 }
 
 restore_workspace() {
-    if [ -n "$original_nargo" ]; then
-        printf '%s' "$original_nargo" > "$ROOT_NARGO"
-        original_nargo=""
+    if [ -n "$backup_file" ] && [ -f "$backup_file" ]; then
+        cp "$backup_file" "$ROOT_NARGO"
+        rm -f "$backup_file"
+        backup_file=""
     fi
 }
 
@@ -84,11 +85,11 @@ run_pattern() {
         return
     fi
 
-    # Verify expected error substring
-    if [ -f "$expected_error_file" ]; then
-        local expected
-        expected=$(cat "$expected_error_file")
-        if printf '%s' "$output" | grep -qF "$expected"; then
+    # Verify expected error substring.
+    # Require a non-empty expected_error.txt: empty file would make grep -qF ""
+    # match any output and silently pass patterns with the wrong error.
+    if [ -s "$expected_error_file" ]; then
+        if printf '%s' "$output" | grep -qFf "$expected_error_file"; then
             echo "  PASS: failed with expected error"
             PASS=$((PASS + 1))
         else
@@ -98,6 +99,9 @@ run_pattern() {
             printf '%s\n' "$output" | tail -10 | sed 's/^/    /'
             FAIL=$((FAIL + 1))
         fi
+    elif [ -f "$expected_error_file" ]; then
+        echo "  FAIL: expected_error.txt exists but is empty — add an error substring"
+        FAIL=$((FAIL + 1))
     else
         echo "  PASS: failed (no expected_error.txt — any error accepted)"
         PASS=$((PASS + 1))
