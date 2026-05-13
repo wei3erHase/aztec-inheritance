@@ -119,6 +119,10 @@ comptime fn add_field(self: TypeDefinition, name: Quoted, typ: Type)
 **Action:** File an upstream Noir issue requesting `TypeDefinition::add_field`. Link the issue
 in `03-gap-analysis.md` G-4 once filed.
 
+**Tracking:** Noir upstream issue not yet filed. This PR serves as the placeholder; the Aztec-side
+design sketch above is complete and ready to implement once the Noir API lands. No code changes
+in this PoC.
+
 ---
 
 ### Event struct auto-injection (Closes G-6)
