@@ -1,4 +1,5 @@
-use crate::{test::utils, TransitiveOverrideHost};
+use crate::main::TransitiveOverrideHost;
+use crate::test::utils;
 
 #[test]
 unconstrained fn transitive_child_override_works_when_overriden_id_is_directly_composed() {

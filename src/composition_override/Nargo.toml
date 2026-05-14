@@ -1,6 +1,6 @@
 [package]
 name = "composition_override_contract"
-type = "contract"
+type = "lib"
 authors = ["Wonderland"]
 compiler_version = ">=1.0.0"
 

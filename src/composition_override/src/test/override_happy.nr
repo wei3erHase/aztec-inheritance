@@ -1,4 +1,5 @@
-use crate::{test::utils, VirtualOverrideHost};
+use crate::main::VirtualOverrideHost;
+use crate::test::utils;
 
 #[test]
 unconstrained fn virtual_template_function_is_overridden_by_host() {

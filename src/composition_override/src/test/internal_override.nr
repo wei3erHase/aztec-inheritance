@@ -1,4 +1,5 @@
-use crate::{InternalOverrideHost, test::utils};
+use crate::main::InternalOverrideHost;
+use crate::test::utils;
 
 #[test]
 unconstrained fn internal_override_is_used_from_template_entrypoint() {

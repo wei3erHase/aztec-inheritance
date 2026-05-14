@@ -1,5 +1,3 @@
-pub mod test;
-
 use aztec::macros::{aztec, AztecConfig};
 
 #[aztec(
