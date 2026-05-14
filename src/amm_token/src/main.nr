@@ -17,9 +17,8 @@ use aztec::macros::{aztec, AztecConfig};
 
 #[aztec(AztecConfig::new().compose("aip20_token"))]
 pub contract Amm {
-    use aztec::{
+use aztec::{
         macros::{
-            events::event,
             functions::{external, initializer, internal, only_self, view},
             storage::storage,
         },
@@ -33,15 +32,6 @@ pub contract Amm {
     // It appears unused to the compiler (Amm's own code does not reference it directly)
     // but is needed to bring the from_field trait method into scope for generated bodies.
     use aztec::protocol::traits::FromField;
-
-    // The Transfer event is required by the composed token functions.
-    // It must match the token template's Transfer event signature exactly.
-    #[event]
-    struct Transfer {
-        from: AztecAddress,
-        to: AztecAddress,
-        amount: u128,
-    }
 
     #[storage]
     struct Storage<Context> {

@@ -20,7 +20,7 @@ This drives the template authoring model:
 
 1. Global names in composable bodies are **host-provided bindings** -- the host decides the value
 2. Template-owned constants must go through `#[contract_library_method]` (not raw globals)
-3. Event structs referenced in composed bodies must be re-declared in the host
+3. Event structs referenced in composed bodies are replayed automatically from template declarations
 4. Storage fields referenced in composed bodies must be declared in the host
 5. Trait imports needed by composed bodies must be present in the host
 6. All composed function names must be unique across the host and all composed templates
@@ -138,7 +138,6 @@ cannot be overridden by the host.
 Hosts cannot figure out what they need by looking at the template's ABI alone. You must document:
 
 - **Storage fields:** every field name and type that composed bodies reference via `self.storage.*`
-- **Event structs:** every event struct type that composed bodies reference via `self.emit(Evt {...})`
 - **Imports/traits:** any trait or import that composed bodies need in the host's `use` block
 - **Initializer call:** the composed internal the host constructor must call, and the parameters
 
@@ -153,9 +152,6 @@ Storage fields required in host:
   total_supply: PublicMutable<u128, Context>
   public_balances: Map<AztecAddress, PublicMutable<u128, Context>, Context>
   minter: PublicImmutable<AztecAddress, Context>
-
-Events required in host:
-  #[event] struct Transfer { from: AztecAddress, to: AztecAddress, amount: u128 }
 
 Imports required in host:
   use aztec::protocol::traits::FromField;
@@ -224,15 +220,10 @@ struct Storage<Context> {
 }
 ```
 
-### 3. Re-declare required event structs
+### 3. Event structs are auto-replayed
 
-```noir
-// Required by composed foo_increment body: self.emit(FooEvt { value: ... })
-#[event]
-struct FooEvt {
-    value: u32,
-}
-```
+Template event structs marked `#[event]` are now replayed into the host during compose, so hosts do not
+redeclare them unless customization is intentionally required.
 
 ### 4. Call the template's init internal from your constructor
 
@@ -297,10 +288,10 @@ Override is local to the host. There is no `super` chain in this MVP.
 
 - [ ] Template functions use only `#[external]`, `#[internal]`, `#[contract_library_method]`
 - [ ] No raw module-scope globals referenced in composable function bodies
-- [ ] Template has a published host requirements document (storage fields, events, imports, init call)
+- [ ] Template has a published host requirements document (storage fields, imports, init call)
 - [ ] All template function/event names are prefixed to avoid collisions
 - [ ] Host declares all required storage fields from every composed template
-- [ ] Host re-declares all required event structs from every composed template
+- [ ] Validate that required events are replayed from composed templates (no manual redeclare needed)
 - [ ] Host constructor calls `_initialize_<template>()` for every composed template that requires init
 - [ ] All directly composed template ids are intentionally chosen (transitive dependencies are auto-included)
 - [ ] A positive surface test exists (composed externals callable)

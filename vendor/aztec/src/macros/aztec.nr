@@ -227,7 +227,7 @@ pub comptime fn aztec(m: Module, args: [AztecConfig]) -> Quoted {
     let (has_public_init_nullifier_fn, emit_public_init_nullifier_fn_body) = generate_emit_public_init_nullifier(m);
     let public_dispatch = generate_public_dispatch(m, has_public_init_nullifier_fn);
 
-    let (composed_functions, composed_abi_exports, composed_self_call_structs) =
+    let (composed_functions, composed_abi_exports, composed_events) =
         if template_override_signatures.is_some() {
             get_composed_templates_quoted(
                 config.composed_templates,
@@ -240,8 +240,8 @@ pub comptime fn aztec(m: Module, args: [AztecConfig]) -> Quoted {
     quote {
         $interface
         $self_call_structs
-        $composed_self_call_structs
         $call_internal_struct
+        $composed_events
         $functions
         $composed_functions
         $fn_abi_exports

@@ -163,8 +163,7 @@ pub comptime fn contract_template(m: Module, template_id: CtString) -> Quoted {
         all_contract_library_methods = quote { $all_contract_library_methods $generated };
     }
 
-    let template_events =
-        m.structs().filter(|s| s.has_named_attribute("event")).map(|s| quote_event_struct(s)).join(quote {});
+    let template_events = m.structs().filter(|s| s.has_named_attribute("event")).map(|s| quote_event_struct(s)).join(quote {});
 
     template_registry::register_template(
         template_id,

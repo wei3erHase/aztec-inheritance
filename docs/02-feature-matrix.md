@@ -32,7 +32,7 @@ proof (pass/fail). Zero hypotheses unresolved.
 | 10 | Host can override a specific template function | PASS | `composition_override`: `fee_bps()` is implemented in host and overrides template default | **IMPLEMENTED** |
 | 11 | `super` call to base implementation | N/A | Compose is flat/non-hierarchical; there is no base, no chain, no `super` concept | **OUT_OF_SCOPE** |
 | 12 | Global names in composed bodies resolve in host scope | PASS (with pattern) | Host declares or imports `FOO_MAGIC`; injected body resolves it. Template must not self-reference its own module globals -- use `#[contract_library_method]` for template-owned constants | **IMPLEMENTED** |
-| 13 | Event structs auto-injected into host from template | FAIL | Host must re-declare every event struct used in composed bodies; language-blocked | **KNOWN_GAP** |
+| 13 | Event structs auto-injected into host from template | PASS | Event struct declarations from templates are replayed automatically | **IMPLEMENTED** |
 | 14 | Host declares all template storage fields manually | PASS (by design) | Host fully owns its storage; templates have no private storage and should not reference slots by id | **BY_DESIGN** |
 | 15 | Storage slot ordering is host-controlled | PASS (by design) | `storage.nr` assigns slots per `fields_as_written()` order in host's Storage struct | **BY_DESIGN** |
 | 16 | Abstract template (all-virtual, not deployable) | PASS (convention) | `composition_fixtures::virtual_template` documents virtual-only external surface for override-based instantiation | **IMPLEMENTED** |
@@ -110,6 +110,6 @@ Aztec template composition is **merge-and-replay**, not Solidity `is`-based inhe
 | Virtual/override single function | Yes (`#10`) |
 | Abstract templates | Yes (`#16`; convention now documented) |
 | Transitive template flattening | Yes |
-| Automatic event struct injection | No (language-blocked) |
+| Automatic event struct injection | Yes (template replay) |
 
 Root causes and decisions for known gaps: [docs/03-gap-analysis.md](03-gap-analysis.md)

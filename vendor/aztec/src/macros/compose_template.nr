@@ -3,7 +3,7 @@
 //! This module provides:
 //! 1. override validation (`compute_template_override_signatures`)
 //! 2. external registry injection with override-aware skipping, using transitive flattening
-//! 3. quoted replay of non-overridden composed template functions
+//! 3. quoted replay of non-overridden composed template functions and event structs
 
 use crate::macros::{
     internals_functions_generation::{external_functions_registry, internal_functions_registry},
@@ -269,12 +269,14 @@ pub(crate) comptime fn inject_template_functions_to_registries(
 }
 
 /// Returns composed quoted code for all non-overridden template entries.
+/// Includes internal helpers, contract-library methods and event structs from composed templates.
 pub(crate) comptime fn get_composed_templates_quoted(
     template_keys: [Field],
     override_signatures: [(Field, Field)],
 ) -> (Quoted, Quoted, Quoted) {
     let mut all_functions = quote {};
     let mut all_abi_exports = quote {};
+    let mut all_events = quote {};
     let template_keys = flatten_template_keys(template_keys);
 
     for template_key in template_keys {
@@ -288,17 +290,23 @@ pub(crate) comptime fn get_composed_templates_quoted(
         let template_functions_opt = template_registry::get_template_functions(template_key);
         let template_contract_library_methods_opt =
             template_registry::get_template_contract_library_methods(template_key);
+        let events_opt = template_registry::get_template_events(template_key);
         assert(
             template_functions_opt.is_some(),
             "compose: template functions are missing in registry; ensure #[contract_template] runs before composition",
         );
         let template_functions = template_functions_opt.unwrap();
         let template_contract_library_methods = template_contract_library_methods_opt.unwrap_or(quote {});
+        let events = if events_opt.is_some() { events_opt.unwrap() } else { quote {} };
 
         all_functions = quote {
             $all_functions
             $template_functions
             $template_contract_library_methods
+        };
+        all_events = quote {
+            $all_events
+            $events
         };
 
         for template_function in own_external_functions(template_module) {
@@ -327,5 +335,5 @@ pub(crate) comptime fn get_composed_templates_quoted(
         }
     }
 
-    (all_functions, all_abi_exports, quote {})
+    (all_functions, all_abi_exports, all_events)
 }

@@ -51,32 +51,29 @@ compose machinery now:
 
 ---
 
-## G-3: Event struct types must be re-declared in host (language-blocked)
+## G-3: Event structs used by composed bodies are auto-replayed (implemented)
 
-**Gap:** Event structs defined in a template and used in composed function bodies must be re-declared
-in the host module. There is no automatic injection.
+**Gap status:** Implemented.
+
+**Gap:** Host-side `#[event]` type declaration was previously required for event structs defined in templates
+that were referenced from composed function bodies.
 
 **Root cause:** Composed function bodies carry raw token streams. The body `{ self.emit(FooEvt {...}) }`
-resolves `FooEvt` in the host module's scope at injection time. If the host does not declare `FooEvt`,
-the injection fails to compile with "could not resolve FooEvt in path".
+resolves `FooEvt` in the host module's scope at injection time.
 
-This is the same root cause as host-scope global resolution (#12 in the matrix): all identifiers in
-composed bodies resolve in host scope. The difference is that event structs cannot be "imported from
-the template crate" the same way globals can, because `#[event]` registration is part of the Aztec
-contract machinery and the struct type must be physically declared in the host module for the
-`self.emit(...)` call to type-check.
+This is now closed by replaying template event declarations during composition:
 
-**Evidence:** `composition_host/src/main.nr` must declare `#[event] struct FooEvt { value: u32 }`.
-Same pattern as `Transfer` re-declaration in `amm_token/src/main.nr`.
+1. `#[contract_template]` stores declarations for all template structs marked `#[event]` in
+   `template_registry.nr`.
+2. `get_composed_templates_quoted` replays these declarations into the host output.
+3. Existing event selector registration remains idempotent to tolerate harmless duplicate registration.
 
-**Decision:** Accept for this PoC. Document as a template authoring rule.
+**Evidence:** `composition_host/src/main.nr` now composes `FooStorageTemplate` without a manually declared
+`FooEvt` and still compiles/runs via composed `foo_increment`.
 
-**Potential improvement:** `#[contract_template]` registers event struct `Quoted` definitions
-alongside function wrappers and replays them into the host. Architecturally feasible (the hook
-point in `template_registry.nr` exists) but requires careful ordering relative to Aztec's own
-event selector registration. Deferred to M5.
+**Decision:** Implemented in PR-2.
 
-**Solidity equivalent:** Base contract events are directly usable in derived contracts. Gap is real.
+**Solidity equivalent:** Base contract events are directly usable in derived contracts.
 
 ---
 

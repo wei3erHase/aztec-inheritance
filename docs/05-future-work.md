@@ -42,6 +42,24 @@ Implemented via recursive transitive flattening with deduplication.
 
 ---
 
+## PR-2: Event struct auto-replay from templates (DONE)
+
+**Goal:** Remove host-side manual event struct redeclaration required for composed templates.
+
+Implemented in `template_registry.nr`, `mod.nr`, and `compose_template.nr`, this PR captures
+template `#[event]` structs at `#[contract_template]` time and replays them when composing.
+
+**Result:** Hosts can compose templates with event-emitting functions without redeclaring event
+structs in the host module.
+
+**Doc updates when done:**
+- `02-feature-matrix.md`: event auto-injection status moved to IMPLEMENTED
+- `03-gap-analysis.md`: G-3 marked implemented
+- `04-template-authoring.md`: remove host event redeclaration requirements
+- `05-future-work.md`: moved out of planned work into done status
+
+---
+
 ## PR-3/PR-4: Virtual/override mechanism + abstract templates (Closes G-2, matrix #10 and #16)
 
 **Status:** Implemented (PR-3).
@@ -108,23 +126,9 @@ in this PoC.
 
 ---
 
-### Event struct auto-injection (Closes G-6)
+### Event struct auto-injection
 
-**Goal:** Event structs referenced in composed bodies are replayed into the host automatically.
-Currently the host must re-declare every event struct used in composed function bodies.
-
-**Status:** Not planned as active work -- inconvenient but not critical. Revisit if a clean
-implementation becomes apparent.
-
-**Approach if pursued:**
-1. `#[contract_template]` registers event struct `Quoted` definitions alongside function wrappers
-   (hook point in `template_registry.nr` exists)
-2. `get_composed_templates_quoted` replays event struct declarations into the host module
-3. Event selector registration is already idempotent (same-name same-signature is allowed)
-
-**Complexity:** Non-trivial -- event registration (`events.nr`) has its own global registry and
-the struct emission timing relative to `#[event]` macro processing must be verified before
-committing to this.
+**Status:** Implemented in PR-2.
 
 ---
 
