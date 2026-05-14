@@ -206,7 +206,18 @@ the host composes the wrong module with no error or warning.
 
 **Current status:** No guard exists. `register_template` does not assert on duplicate keys.
 
-**Future discussion:** Add an `assert(TEMPLATE_MODULES.get(t_key).is_none(), "duplicate template id: ...")` guard in `register_template`. This converts the silent overwrite into a loud compile-time error. Intentional re-registration (if ever needed) would require an explicit opt-in API. Not implemented yet — tracked as a separate discussion.
+**Legitimate use case — version pinning:** If A composes B and C, and both transitively pull in
+different implementations of the same interface registered under the same ID (call them D and D'),
+A can explicitly pin a preferred version by re-registering that template ID in its own crate. Because
+A's crate elaborates last, its registration wins. `flatten_template_keys` deduplicates by key, so
+D/D' are treated as one template and A's pinned version is what gets injected and replayed. This is
+the one scenario where intentional re-registration is semantically meaningful.
+
+**Future discussion:** An unconditional assert would break version pinning. The right guard is
+either (a) an explicit `.pin("d_template", module)` API in the compose config that opts into
+intentional replacement, or (b) a `#[contract_template_override("d_template")]` attribute that
+signals the re-registration is deliberate. Either approach converts the implicit overwrite into an
+explicit, reviewable declaration. Tracked as a separate discussion — no implementation yet.
 
 ---
 
