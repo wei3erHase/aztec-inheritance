@@ -1,5 +1,5 @@
 [package]
-name = "composition_override_contract"
+name = "composition_override_internal_contract"
 type = "contract"
 authors = ["Wonderland"]
 compiler_version = ">=1.0.0"

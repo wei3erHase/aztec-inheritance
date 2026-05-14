@@ -34,6 +34,10 @@ src/
   composition_transitive/  Proof: transitive compose is flattened
   composition_host/        Proof: storage + events + library constants via compose
   composition_override/    Proof: virtual/override mechanism works
+  composition_override_dual/  Proof: multiple override candidates and explicit direct overrides
+  composition_override_internal/  Proof: internal override behavior and local constraints
+  composition_override_transitive/  Proof: override works only across direct compose edge
+  composition_diamond_transitive/  Proof: duplicate selectors across transitive templates flattening
   composition_collision_fail/  Poison: name collision => fatal compile error (excluded from workspace)
 docs/
   01-architecture.md       How template composition works mechanically
