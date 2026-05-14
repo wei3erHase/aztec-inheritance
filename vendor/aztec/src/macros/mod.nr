@@ -49,6 +49,21 @@ comptime fn generate_contract_library_method_quote(f: FunctionDefinition) -> Quo
     }
 }
 
+comptime fn quote_event_struct(event_struct: TypeDefinition) -> Quoted {
+    let struct_name = event_struct.name();
+    let fields = event_struct.fields_as_written().map(|field| {
+        let (name, typ, _) = field;
+        quote { $name: $typ }
+    }).join(quote {,});
+
+    quote {
+        #[aztec::macros::events::event]
+        struct $struct_name {
+            $fields
+        }
+    }
+}
+
 /// Registers a contract module as a named composition template.
 ///
 /// Apply this attribute to any template contract so that
@@ -120,11 +135,14 @@ pub comptime fn contract_template(m: Module, template_id: CtString) -> Quoted {
         all_contract_library_methods = quote { $all_contract_library_methods $generated };
     }
 
+    let template_events = m.structs().filter(|s| s.has_named_attribute("event")).map(|s| quote_event_struct(s)).join(quote {});
+
     template_registry::register_template(
         template_id,
         all_functions,
         all_abi_exports,
         all_contract_library_methods,
+        template_events,
         m,
     );
     quote {}

@@ -12,8 +12,8 @@
 //!
 //! 2. `get_composed_templates_quoted(template_ids)`: Returns the pre-generated Quoted code (stored
 //!    by `#[contract_template(...)]`) for the `__aztec_nr_internals__` wrappers, ABI
-//!    export structs, and contract library helpers. This avoids the Noir cross-crate `f.body()`
-//!    limitation since the bodies were captured in the template crate.
+//!    export structs, contract library helpers, and event struct declarations. This avoids the
+//!    Noir cross-crate `f.body()` limitation since the bodies were captured in the template crate.
 
 use crate::macros::{
     internals_functions_generation::{external_functions_registry, internal_functions_registry},
@@ -122,8 +122,7 @@ pub(crate) comptime fn inject_template_functions_to_registries(
 /// - `functions`: all `__aztec_nr_internals__` wrappers (private, public, utility, internal) plus
 ///   contract library helpers referenced by them.
 /// - `abi_exports`: all ABI export parameter/abi structs.
-/// - `_self_call_structs`: Always empty (the host's `generate_external_function_self_calls_structs`
-///   covers them via the composed registries).
+/// - `events`: all `#[event]` struct declarations captured from template modules.
 ///
 /// Panics if any requested template id has not been registered.
 pub(crate) comptime fn get_composed_templates_quoted(
@@ -131,21 +130,25 @@ pub(crate) comptime fn get_composed_templates_quoted(
 ) -> (Quoted, Quoted, Quoted) {
     let mut all_functions = quote {};
     let mut all_abi_exports = quote {};
+    let mut all_events = quote {};
     let template_keys = flatten_template_keys(template_keys);
 
     for template_key in template_keys {
         let functions_opt = template_registry::get_template_functions(template_key);
         let abi_exports_opt = template_registry::get_template_abi_exports(template_key);
         let contract_library_methods_opt = template_registry::get_template_contract_library_methods(template_key);
+        let events_opt = template_registry::get_template_events(template_key);
 
         let functions = if functions_opt.is_some() { functions_opt.unwrap() } else { quote {} };
         let abi_exports = if abi_exports_opt.is_some() { abi_exports_opt.unwrap() } else { quote {} };
         let contract_library_methods =
             if contract_library_methods_opt.is_some() { contract_library_methods_opt.unwrap() } else { quote {} };
+        let events = if events_opt.is_some() { events_opt.unwrap() } else { quote {} };
 
         all_functions = quote { $all_functions $contract_library_methods $functions };
         all_abi_exports = quote { $all_abi_exports $abi_exports };
+        all_events = quote { $all_events $events };
     }
 
-    (all_functions, all_abi_exports, quote {})
+    (all_functions, all_abi_exports, all_events)
 }

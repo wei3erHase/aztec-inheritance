@@ -3,3 +3,4 @@ pub mod bar_template;
 pub mod mid_template;
 pub mod foo_storage_template;
 pub mod foo_collision_template;
+pub mod foo_event_collision_template;

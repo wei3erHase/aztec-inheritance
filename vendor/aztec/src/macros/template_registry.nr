@@ -11,6 +11,7 @@ use crate::utils::cmap::CHashMap;
 comptime mut global TEMPLATE_FUNCTIONS_QUOTED: CHashMap<Field, Quoted> = CHashMap::new();
 comptime mut global TEMPLATE_ABI_EXPORTS_QUOTED: CHashMap<Field, Quoted> = CHashMap::new();
 comptime mut global TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED: CHashMap<Field, Quoted> = CHashMap::new();
+comptime mut global TEMPLATE_EVENTS_QUOTED: CHashMap<Field, Quoted> = CHashMap::new();
 
 comptime mut global TEMPLATE_MODULES: CHashMap<Field, Module> = CHashMap::new();
 comptime mut global TEMPLATE_KEY_BY_MODULE_NAME: CHashMap<Quoted, Field> = CHashMap::new();
@@ -45,6 +46,7 @@ pub(crate) comptime fn register_template(
     functions: Quoted,
     abi_exports: Quoted,
     contract_library_methods: Quoted,
+    events: Quoted,
     m: Module,
 ) {
     let t_key = template_key(template_id);
@@ -52,6 +54,7 @@ pub(crate) comptime fn register_template(
     TEMPLATE_FUNCTIONS_QUOTED.insert(t_key, functions);
     TEMPLATE_ABI_EXPORTS_QUOTED.insert(t_key, abi_exports);
     TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED.insert(t_key, contract_library_methods);
+    TEMPLATE_EVENTS_QUOTED.insert(t_key, events);
     TEMPLATE_MODULES.insert(t_key, m);
     TEMPLATE_KEY_BY_MODULE.insert(m, t_key);
     TEMPLATE_KEY_BY_MODULE_NAME.insert(m.name(), t_key);
@@ -68,6 +71,10 @@ pub(crate) comptime fn get_template_abi_exports(template_key: Field) -> Option<Q
 
 pub(crate) comptime fn get_template_contract_library_methods(template_key: Field) -> Option<Quoted> {
     TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED.get(template_key)
+}
+
+pub(crate) comptime fn get_template_events(template_key: Field) -> Option<Quoted> {
+    TEMPLATE_EVENTS_QUOTED.get(template_key)
 }
 
 pub(crate) comptime fn get_template_module(template_key: Field) -> Option<Module> {

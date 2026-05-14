@@ -32,14 +32,14 @@ proof (pass/fail). Zero hypotheses unresolved.
 | 10 | Host can override a specific template function | NOT YET | No override mechanism; collision is fatal today | **PLANNED_CHANGE** |
 | 11 | `super` call to base implementation | N/A | Compose is flat/non-hierarchical; there is no base, no chain, no `super` concept | **OUT_OF_SCOPE** |
 | 12 | Global names in composed bodies resolve in host scope | PASS (with pattern) | Host declares or imports `FOO_MAGIC`; injected body resolves it. Template must not self-reference its own module globals -- use `#[contract_library_method]` for template-owned constants | **IMPLEMENTED** |
-| 13 | Event structs auto-injected into host from template | FAIL | Host must re-declare every event struct used in composed bodies; language-blocked | **KNOWN_GAP** |
+| 13 | Event structs auto-injected into host from template | PASS | Event struct declarations from templates are replayed automatically | **IMPLEMENTED** |
 | 14 | Host declares all template storage fields manually | PASS (by design) | Host fully owns its storage; templates have no private storage and should not reference slots by id | **BY_DESIGN** |
 | 15 | Storage slot ordering is host-controlled | PASS (by design) | `storage.nr` assigns slots per `fields_as_written()` order in host's Storage struct | **BY_DESIGN** |
 | 16 | Abstract template (all-virtual, not deployable) | NOT YET | Implementable alongside #10: a template with only virtual functions is abstract by convention | **PLANNED_CHANGE** |
 | 17 | `private` function inaccessible to host (Solidity visibility) | N/A | Compose copies quoted function bodies, not Solidity-style imports. There is no private scope in the copy model -- all composed functions are visible to the host | **OUT_OF_SCOPE** |
 | 18 | Inheritable/overridable modifiers | N/A | Aztec uses function-level attributes (`#[only_self]`, `#[authorize_once]`); no modifier chain | **OUT_OF_SCOPE** |
 
-**Summary: 10 IMPLEMENTED, 2 PLANNED_CHANGE, 2 KNOWN_GAP, 2 BY_DESIGN, 3 OUT_OF_SCOPE, 0 UNRESOLVED**
+**Summary: 11 IMPLEMENTED, 2 PLANNED_CHANGE, 0 KNOWN_GAP, 2 BY_DESIGN, 3 OUT_OF_SCOPE, 0 UNRESOLVED**
 
 ---
 
@@ -109,6 +109,6 @@ Aztec template composition is **merge-and-replay**, not Solidity `is`-based inhe
 | Virtual/override single function | Planned (M4) |
 | Abstract templates | Planned (M4, follows from virtual/override) |
 | Transitive template flattening | Yes |
-| Automatic event struct injection | No (language-blocked) |
+| Automatic event struct injection | Yes (template replay) |
 
 Root causes and decisions for known gaps: [docs/03-gap-analysis.md](03-gap-analysis.md)
