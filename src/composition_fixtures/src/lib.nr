@@ -1,0 +1,17 @@
+pub mod foo_template;
+pub mod bar_template;
+pub mod mid_template;
+pub mod foo_storage_template;
+pub mod foo_collision_template;
+pub mod virtual_template;
+pub mod virtual_mid_template;
+pub mod virtual_mid_override_chain_template;
+pub mod internal_override_template;
+pub mod internal_override_non_virtual_template;
+pub mod foo_event_collision_template;
+pub mod transitive_diamond_leaf;
+pub mod transitive_diamond_conflict_leaf;
+pub mod transitive_diamond_left_template;
+pub mod transitive_diamond_right_template;
+pub mod transitive_diamond_left_conflict_template;
+pub mod transitive_diamond_right_conflict_template;

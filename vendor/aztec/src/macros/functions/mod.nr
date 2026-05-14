@@ -5,7 +5,7 @@ pub(crate) mod auth_registry;
 
 use crate::macros::{
     internals_functions_generation::{external_functions_registry, internal_functions_registry},
-    utils::{is_fn_external, module_has_initializer},
+    utils::{is_fn_external, is_fn_internal, module_has_initializer},
 };
 use super::utils::{fn_has_allow_phase_change, fn_has_noinitcheck, is_fn_initializer, is_fn_only_self, is_fn_view};
 use auth_registry::AUTHORIZE_ONCE_REGISTRY;
@@ -137,9 +137,23 @@ pub comptime fn noinitcheck(f: FunctionDefinition) {
     }
 }
 
+/// Marks a function as safe to override in composed hosts.
+///
+/// This is a marker attribute only. The function body and signature are still compiled normally.
+/// Host contracts can replace the implementation by declaring a function with the same signature and adding that
+/// template function to `AztecConfig::override_template(...)`.
+pub comptime fn template_virtual(f: FunctionDefinition) {
+    if !is_fn_external(f) & !is_fn_internal(f) {
+        let name = f.name();
+        panic(
+            f"The #[template_virtual] attribute can only be applied to #[external(\"private\")], #[external(\"public\")], #[external(\"utility\")], or #[internal(\"public\")]/#[internal(\"private\")] functions - {name} is neither",
+        );
+    }
+}
+
 /// An `allow_phase_change` function will allow transitioning from the non-revertible to the revertible phase
 /// during its execution.
-///
+///  
 /// This is an advanced feature that is typically only required for account contract entrypoints that handle
 /// transaction fee payment.
 ///

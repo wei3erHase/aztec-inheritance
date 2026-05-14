@@ -7,4 +7,3 @@ type = "lib"
 [dependencies]
 aztec = { path = "../aztec" }
 uint_note = { path = "../uint-note" }
-

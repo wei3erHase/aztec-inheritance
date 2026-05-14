@@ -1,0 +1,8 @@
+[package]
+name = "composition_fixtures"
+type = "lib"
+authors = ["Wonderland"]
+compiler_version = ">=1.0.0"
+
+[dependencies]
+aztec = { path = "../../vendor/aztec" }

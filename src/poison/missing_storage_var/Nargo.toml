@@ -1,0 +1,17 @@
+[package]
+name = "missing_storage_var"
+type = "contract"
+authors = ["Wonderland"]
+compiler_version = ">=1.0.0"
+
+# Poison package: EXPECTED to fail compilation.
+#
+# When a host composes foo_storage but does NOT declare the required storage
+# fields, the composed function bodies (replayed as Quoted tokens) reference
+# fields that don't exist on the host's Storage struct.
+#
+# Expected failure: Noir field-access error on self.storage.foo_counter.
+
+[dependencies]
+aztec = { path = "../../../vendor/aztec" }
+composition_fixtures = { path = "../../composition_fixtures" }

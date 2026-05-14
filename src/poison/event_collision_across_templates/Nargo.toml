@@ -1,0 +1,17 @@
+[package]
+name = "event_collision_across_templates"
+type = "contract"
+authors = ["Wonderland"]
+compiler_version = ">=1.0.0"
+
+# Poison package: EXPECTED to fail compilation.
+#
+# Both `foo_storage` and `foo_event_collision` define an event struct named `FooEvt`.
+# PR-2 replays both event sets into the host, producing two `struct FooEvt` definitions
+# in the same module -- a duplicate struct definition error.
+#
+# Constraint: template authors must use unique event names across the compose surface.
+
+[dependencies]
+aztec = { path = "../../../vendor/aztec" }
+composition_fixtures = { path = "../../composition_fixtures" }

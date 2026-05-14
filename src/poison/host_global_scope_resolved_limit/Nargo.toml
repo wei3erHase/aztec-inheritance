@@ -1,0 +1,8 @@
+[package]
+name = "host_global_scope_resolved_limit"
+type = "contract"
+authors = ["Wonderland"]
+compiler_version = ">=1.0.0"
+
+[dependencies]
+aztec = { path = "../../../vendor/aztec" }

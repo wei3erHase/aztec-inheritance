@@ -1,0 +1,19 @@
+[package]
+name = "transitive_diamond_leaf_collision"
+type = "contract"
+authors = ["Wonderland"]
+compiler_version = ">=1.0.0"
+
+# Poison package: EXPECTED to fail compilation.
+#
+# `transitive_diamond_left_conflict_template` introduces `leaf_value` via
+# `transitive_diamond_conflict_leaf`, while
+# `transitive_diamond_right_conflict_template` introduces `leaf_value` via
+# `transitive_diamond_leaf`.
+#
+# Even though both `leaf_value` methods are transitive, transitive flattening
+# attempts to inject both into the host ABI, so selector collision must fail.
+
+[dependencies]
+aztec = { path = "../../../vendor/aztec" }
+composition_fixtures = { path = "../../composition_fixtures" }
