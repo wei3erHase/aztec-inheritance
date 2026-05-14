@@ -121,7 +121,7 @@ for pkg_dir in "$POISON_DIR"/*/; do
     [ -f "$pkg_dir/Nargo.toml" ] || continue
 
     pkg_name=$(basename "$pkg_dir")
-    if [ -n "$FILTER" ] && [ "$pkg_name" != "$FILTER" ]; then
+    if [ -n "$FILTER" ] && [[ "$pkg_name" != *"$FILTER"* ]]; then
         continue
     fi
 
