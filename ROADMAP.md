@@ -1,6 +1,6 @@
 # Roadmap: Aztec Contract Template Composition
 
-> **Status:** M2 complete, M3 done (basic surface), M4 planned  
+> **Status:** M4 complete -- all planned PoC features implemented  
 > **Last updated:** 2026-05-13
 
 ---
@@ -12,7 +12,7 @@
 | M0 | ADR + workspace setup | Done | Workspace, repo isolation, initial architecture decisions |
 | M2 | Generic template composition PoC + test scaffold | Done | Generic vendor machinery; token mixin as first consumer; all 18 hypotheses validated |
 | M3 | Basic test surface | Done | Core behavior tests pass; full parity not planned |
-| M4 | Virtual/override mechanism + abstract templates | Planned | Macro-level only; see docs/05-future-work.md for design |
+| M4 | Virtual/override mechanism + abstract templates | Done | `#[template_virtual]` + `override_template(...)` in `AztecConfig`; `composition_override` evidence package |
 | M5 | Docs, migration guide, security review | Planned | After M4 |
 
 ---
@@ -25,7 +25,7 @@
 - `TokenContractTemplate` (AIP-20 surface) as first real consumer
 - `Amm` host contract: AMM pool + full token at one address, 4 developer-written functions, 24 token functions generated
 - Test scaffold: `composition_fixtures`, `composition_multi`, `composition_transitive`, `composition_host`, `composition_collision_fail` (poison)
-- 18 Solidity inheritance hypotheses validated (10 IMPLEMENTED, 2 PLANNED_CHANGE, 2 KNOWN_GAP, 2 BY_DESIGN, 3 OUT_OF_SCOPE)
+- 18 Solidity inheritance hypotheses validated (12 IMPLEMENTED, 0 PLANNED_CHANGE, 1 KNOWN_GAP, 2 BY_DESIGN, 3 OUT_OF_SCOPE)
 
 **What compiles and runs:**
 
@@ -36,28 +36,25 @@ aztec test    # 4 amm_token tests pass; composition_multi + composition_transiti
 
 ---
 
-## M4: Virtual/override (next)
-
-See `docs/05-future-work.md` PR-3/PR-4 for the full design. In brief:
-
-1. `#[template_virtual]` attribute on template functions marks them as overridable
-2. Host declares `#[template_override("template_id")]` OR uses config-level
-   `AztecConfig::new().compose("foo").override_template("foo", "fee_bps")`
-3. `inject_template_functions_to_registries` skips overridden template functions; host version wins
-4. Error on: collision without override declared; override declared for non-virtual function;
-   override target not found
-
-Test package: `src/composition_override/`
-
----
-
 ## Open limitations
 
 | ID | Limitation | Status |
 |----|-----------|--------|
-| G-2 | No virtual/override mechanism; collision is fatal | PR-3/PR-4: M4 planned |
-| G-3 | Event structs must be re-declared in host | Not planned; inconvenient but not critical |
 | G-4 | Host must manually declare all template storage fields | Blocked on Noir `TypeDefinition::add_field`; design sketch in docs/05-future-work.md |
+
+### 2026-05-13 -- PR-3 virtual/override shipped
+
+`#[template_virtual]` attribute marks template external functions as overridable. Hosts use
+`AztecConfig::new().compose("foo").override_template("foo", "fee_bps")` to replace a template
+function with a host implementation. Override validation rejects: override of non-virtual functions,
+missing signatures, unknown template IDs. Evidence: `composition_override` + `virtual_template`.
+Closes G-2. Implements matrix #10 and #16 (virtual/override + abstract templates).
+
+### 2026-05-13 -- PR-2 event auto-replay shipped
+
+Template `#[event]` structs are now captured at `#[contract_template]` time and replayed into the
+host automatically during composition. Hosts no longer need to manually re-declare event structs
+from composed templates. Closes G-3. Implements matrix #13.
 
 ### 2026-05-13 -- PR-1 transitive composition shipped
 
