@@ -62,70 +62,19 @@ structs in the host module.
 
 ## PR-3/PR-4: Virtual/override mechanism + abstract templates (Closes G-2, matrix #10 and #16)
 
-**Status:** Blocked. Current compose registry stores template wrappers as monolithic quoted blobs, so
-overridden-function filtering requires a deeper per-function registry refactor before this can be safely
-implemented without changing emitted ABI semantics.
+**Status:** Implemented (PR-3).
 
-**Goal:** Allow a host to override specific template functions without triggering a collision.
-A template where ALL functions are virtual is effectively an abstract template (#16 -- implementable
-as a convention on top of #10, requiring no additional mechanism).
+Template functions can be marked with `#[template_virtual]` and replaced by host implementations via
+`override_template("template_id", "fn_name")` in `AztecConfig`.
 
-### API shape
+- Single-level override only (no `super`).
+- Abstract templates are now a convention via `#[template_virtual]` on all external functions.
+- No storage/events changes were required for this PR.
 
-**Option A (preferred, requires new Noir attribute placement):**
+### Evidence
 
-```noir
-// Template marks function as overridable
-#[contract_template("foo")]
-contract FooTemplate {
-    #[external("public")]
-    #[template_virtual]
-    fn fee_bps() -> u16 { 30 }
-}
-
-// Host overrides it
-#[aztec(AztecConfig::new().compose("foo"))]
-contract Host {
-    #[external("public")]
-    #[template_override("foo")]
-    fn fee_bps() -> u16 { 5 }
-}
-```
-
-**Option B (MVP, no new fn attribute syntax):**
-
-```noir
-#[aztec(
-    AztecConfig::new()
-        .compose("foo")
-        .override_template("foo", "fee_bps")
-)]
-```
-
-### Implementation plan
-
-1. Add `TEMPLATE_VIRTUAL_SIG_KEYS: CHashMap<Field, [Field]>` to `template_registry.nr`
-2. Compute host own signature set from `get_own_*_functions` (avoids cross-crate body limitation)
-3. Replace unconditional add in `inject_template_functions_to_registries` with a policy gate:
-   - no collision + no override declared: inject normally
-   - collision + override declared + template marks function virtual: skip injection (host wins)
-   - collision + no override declared: emit "selector collision" error
-   - override declared for non-virtual function: emit "not virtual" error
-4. Refactor `get_composed_templates_quoted` to accept an include-filter and skip overridden
-   function wrappers/ABI from the quoted replay
-5. Per-function registry storage (currently monolithic blobs per template):
-   ```
-   TEMPLATE_FN_WRAPPERS: CHashMap<(template_key, sig_key), Quoted>
-   TEMPLATE_FN_ABI: CHashMap<(template_key, sig_key), Quoted>
-   ```
-
-### Test plan (in `src/composition_override/`)
-
-- `virtual_override_happy_path` -- template has virtual `x()`, host overrides, ABI has single entry
-- `override_without_virtual_fails` -- override declared on non-virtual function, compile error
-- `collision_without_override_fails` -- same as collision test today, better diagnostic
-- `override_missing_target_fails` -- override references absent template method, compile error
-- `multi_template_conflict_resolved` -- two templates same sig, host override picks one
+- `composition_override` test package
+- `composition_fixtures/virtual_template`
 
 ---
 

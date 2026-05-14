@@ -30,33 +30,24 @@ the warning closes the UX gap.
 
 ---
 
-## G-2: No virtual/override mechanism (blocked)
+## G-2: No virtual/override mechanism (resolved)
 
-**Gap:** Two composed templates with the same function name cause a compile error. The host cannot
-override a composed template function. This is currently blocked by registry shape: template wrappers
-and ABI exports are stored as per-template aggregates, so selective override filtering is not
-implemented without a deeper refactor.
+**Gap:** resolved by PR-3. Template external functions can be marked `#[template_virtual]`, and hosts
+can replace them via `override_template("template_id", "fn_name")` in `AztecConfig`.
 
-**Root cause:** The compose machinery generates one `__aztec_nr_internals__<fn_name>` wrapper per
-function. `generate_public_dispatch` rejects duplicate selectors. There is no mechanism to mark a
-function as "overridable" or build an override chain.
+**Resolution:** Template external functions can be marked `#[template_virtual]`, and hosts can replace
+them by declaring `override_template("template_id", "fn_name")` in `AztecConfig`.
 
-**Evidence:** `composition_collision_fail` -- composing `foo_template` and `foo_collision_template`
-(both define `foo_value()`) panics with "Public function selector collision detected".
+compose machinery now:
 
-**Implementation plan (M4):**
+1. validates override declarations (template exists, target exists, signature exists, not duplicated);
+2. requires the target template function to be virtual;
+3. skips overridden template functions during both composed function registry injection and template quoted replay;
+4. preserves non-overridden template functions and ABI entries in host composition output.
 
-1. `#[template_virtual]` attribute on template functions to opt into override
-2. Host declares `#[template_override("template_id")]` on the replacing function,
-   OR config-driven: `AztecConfig::new().compose("foo").override_template("foo", "fee_bps")`
-3. Logic in `inject_template_functions_to_registries` to skip overridden template functions
-4. Selective quoted replay to exclude overridden ABI/wrappers from `get_composed_templates_quoted`
-5. Errors: collision with no override declared, override declared for non-virtual function,
-   override target not found
+**Evidence:** `composition_override` + `composition_fixtures::virtual_template`
 
-**See:** [docs/05-future-work.md](05-future-work.md) M4 for the full design.
-
-**Solidity equivalent:** `virtual`/`override` + C3 linearization. Gap is real, fix is planned.
+**Solidity equivalent:** `virtual`/`override` (single-level merge-and-replay). There is still no C3 linearization or `super`.
 
 ---
 
@@ -95,7 +86,7 @@ linearization, no implicit ordering.
 **Implications:**
 - Multi-compose is flat: all templates at the same level with equal precedence
 - Transitive flattening (G-1); all composed templates are recursively included by `compose()`
-- No override chain today (G-2); planned for M4
+- No override chain today (G-2); single-level replacement implemented in PR-3
 - `super` does not apply: there is no "parent implementation" in a flat merge
 - All composed function names must be unique across the host and all composed templates
 

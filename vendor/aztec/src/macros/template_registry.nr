@@ -1,9 +1,8 @@
-//! Registry that stores the pre-generated Quoted code for contract templates.
+//! Registry that stores pre-generated Quoted code for contract templates.
 //!
-//! The `#[contract_template(...)]` macro processes all functions in a template contract and
-//! generates their `__aztec_nr_internals__` wrappers, ABI exports, and helper wrappers as
-//! `Quoted` at the time the template module is elaborated. This pre-generated code is stored here
-//! and retrieved by the composition machinery to be included in the host module's output.
+//! - template functions/abi exports/contract-library methods/events by template key
+//! - external wrappers and abi exports by `(template_key, function_signature)` pair
+//! - template module references and virtual markers
 
 use crate::utils::cmap::CHashMap;
 
@@ -26,6 +25,11 @@ comptime mut global TEMPLATE_COMPOSED_KEYS_BY_MODULE: CHashMap<Module, [Field]> 
 // Populated by contract_template so the aztec macro can determine whether the current module
 // is a registered template and store transitive composed-key relationships for it.
 comptime mut global TEMPLATE_KEY_BY_MODULE: CHashMap<Module, Field> = CHashMap::new();
+
+// Per-function wrapper and ABI storage, keyed by (template_key, function_signature_key).
+comptime mut global TEMPLATE_EXTERNAL_FN_WRAPPERS: CHashMap<(Field, Field), Quoted> = CHashMap::new();
+comptime mut global TEMPLATE_EXTERNAL_FN_ABI_EXPORTS: CHashMap<(Field, Field), Quoted> = CHashMap::new();
+comptime mut global TEMPLATE_VIRTUAL_EXTERNAL_FN_KEYS: CHashMap<(Field, Field), bool> = CHashMap::new();
 
 pub(crate) comptime fn template_key(template_id: CtString) -> Field {
     let template_id_str = template_id.as_quoted_str!();
@@ -59,6 +63,21 @@ pub(crate) comptime fn register_template(
     TEMPLATE_KEY_BY_MODULE.insert(m, t_key);
     TEMPLATE_KEY_BY_MODULE_NAME.insert(m.name(), t_key);
     TEMPLATE_KEY_BY_MODULE_NAME_HASH.insert(template_name_key, t_key);
+}
+
+pub(crate) comptime fn register_external_function(
+    template_key: Field,
+    function_key: Field,
+    wrapper: Quoted,
+    abi_export: Quoted,
+    is_virtual: bool,
+) {
+    let registry_key = (template_key, function_key);
+    TEMPLATE_EXTERNAL_FN_WRAPPERS.insert(registry_key, wrapper);
+    TEMPLATE_EXTERNAL_FN_ABI_EXPORTS.insert(registry_key, abi_export);
+    if is_virtual {
+        TEMPLATE_VIRTUAL_EXTERNAL_FN_KEYS.insert(registry_key, true);
+    }
 }
 
 pub(crate) comptime fn get_template_functions(template_key: Field) -> Option<Quoted> {
@@ -116,4 +135,22 @@ pub(crate) comptime fn get_template_composed_keys(t_key: Field) -> Option<[Field
 
 pub(crate) comptime fn get_template_composed_keys_by_module(m: Module) -> Option<[Field]> {
     TEMPLATE_COMPOSED_KEYS_BY_MODULE.get(m)
+}
+
+pub(crate) comptime fn get_template_external_function_wrapper(
+    template_key: Field,
+    function_key: Field,
+) -> Option<Quoted> {
+    TEMPLATE_EXTERNAL_FN_WRAPPERS.get((template_key, function_key))
+}
+
+pub(crate) comptime fn get_template_external_function_abi_export(
+    template_key: Field,
+    function_key: Field,
+) -> Option<Quoted> {
+    TEMPLATE_EXTERNAL_FN_ABI_EXPORTS.get((template_key, function_key))
+}
+
+pub(crate) comptime fn is_template_external_function_virtual(template_key: Field, function_key: Field) -> bool {
+    TEMPLATE_VIRTUAL_EXTERNAL_FN_KEYS.get((template_key, function_key)).is_some()
 }

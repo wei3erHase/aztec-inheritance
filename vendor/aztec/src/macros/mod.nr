@@ -28,6 +28,10 @@ use internals_functions_generation::{
 };
 use utils::is_fn_contract_library_method;
 
+comptime fn function_signature_key(f: FunctionDefinition) -> Field {
+    crate::macros::utils::compute_fn_selector(f.name(), f.parameters())
+}
+
 comptime fn generate_contract_library_method_quote(f: FunctionDefinition) -> Quoted {
     let name = f.name();
     let visibility = f.visibility();
@@ -74,31 +78,55 @@ comptime fn quote_event_struct(event_struct: TypeDefinition) -> Quoted {
 /// for the template contract's functions, storing the resulting `Quoted` in the global registry so
 /// that the cross-crate `f.body()` limitation is avoided at injection time.
 pub comptime fn contract_template(m: Module, template_id: CtString) -> Quoted {
+    let template_key = template_registry::template_key(template_id);
+
     // Pre-generate all external function wrappers.
     let private_fns = external_functions_registry::get_private_functions(m);
     let public_fns = external_functions_registry::get_public_functions(m);
     let utility_fns = external_functions_registry::get_utility_functions(m);
+
+    for f in private_fns {
+        let wrapper = generate_private_external(f);
+        let abi = create_fn_abi_export(f);
+        template_registry::register_external_function(
+            template_key,
+            function_signature_key(f),
+            wrapper,
+            abi,
+            f.has_named_attribute("template_virtual"),
+        );
+    }
+
+    for f in public_fns {
+        let wrapper = generate_public_external(f);
+        let abi = create_fn_abi_export(f);
+        template_registry::register_external_function(
+            template_key,
+            function_signature_key(f),
+            wrapper,
+            abi,
+            f.has_named_attribute("template_virtual"),
+        );
+    }
+
+    for f in utility_fns {
+        let wrapper = generate_utility_external(f);
+        let abi = create_fn_abi_export(f);
+        template_registry::register_external_function(
+            template_key,
+            function_signature_key(f),
+            wrapper,
+            abi,
+            f.has_named_attribute("template_virtual"),
+        );
+    }
+
 
     // Pre-generate all internal function wrappers.
     let priv_internal_fns = internal_functions_registry::get_private_functions(m);
     let pub_internal_fns = internal_functions_registry::get_public_functions(m);
 
     let mut all_functions = quote {};
-
-    for f in private_fns {
-        let generated = generate_private_external(f);
-        all_functions = quote { $all_functions $generated };
-    }
-
-    for f in public_fns {
-        let generated = generate_public_external(f);
-        all_functions = quote { $all_functions $generated };
-    }
-
-    for f in utility_fns {
-        let generated = generate_utility_external(f);
-        all_functions = quote { $all_functions $generated };
-    }
 
     for f in priv_internal_fns {
         let generated = generate_private_internal(f);

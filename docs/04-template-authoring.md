@@ -51,6 +51,30 @@ Functions that compose cleanly:
 | Internal public/private | `#[internal("public")]` etc. | Body captured as `Quoted`, replayed in host |
 | Library helper | `#[contract_library_method]` | Migrated via `f.as_typed_expr()` -- no body tokens |
 
+### 2b. Mark overridable template methods
+
+Add `#[template_virtual]` to any external function that a host may replace.
+
+```noir
+use aztec::macros::functions::{external, template_virtual, view};
+
+#[template_virtual]
+#[external("public")]
+#[view]
+fn fee_bps() -> u16 {
+    30
+}
+```
+
+The function is still implemented normally in the template. The host replaces it with
+`override_template("template_id", "fee_bps")` and its own same-signature function body.
+
+Guidance:
+
+- Non-virtual template functions cannot be overridden.
+- A host override must match the full signature (name + parameter types).
+- A template where all external methods are virtual is an abstract template by convention.
+
 ### 3. Two patterns for constants: template-owned vs host-provided
 
 There is no way for a template to self-reference its own module globals in composable function
@@ -139,7 +163,7 @@ Initializer:
 
 ### 5. Use name prefixes to avoid collisions
 
-Since collision is fatal (no override mechanism), use template-specific prefixes:
+Since unmarked collisions remain fatal, use template-specific prefixes:
 
 - External functions: `foo_get()`, `foo_increment()` (not `get()`, `increment()`)
 - Internal helpers: `_foo_set()`, `_foo_validate()` (underscore + prefix)
@@ -224,6 +248,39 @@ Add a header comment listing your composed templates and what they provide:
 // Host-declared events: Transfer
 // Required by template: FromField trait import
 ```
+
+## Host override rules
+
+### 1. Declare overrides in `AztecConfig`
+
+```noir
+use aztec::macros::AztecConfig;
+
+#[aztec(
+    AztecConfig::new()
+        .compose("virtual_template")
+        .override_template("virtual_template", "fee_bps")
+)]
+pub contract Host {
+    ...
+}
+```
+
+### 2. Provide the replacement body in the host contract
+
+```noir
+use aztec::macros::functions::{external, view};
+
+#[external("public")]
+#[view]
+fn fee_bps() -> u16 {
+    5
+}
+```
+
+### 3. Keep replacements single-level
+
+Override is local to the host. There is no `super` chain in this MVP.
 
 ---
 
