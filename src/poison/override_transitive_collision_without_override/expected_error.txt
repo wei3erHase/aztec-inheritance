@@ -1,0 +1,1 @@
+compose: host function selector collision; mark template function as #[template_virtual] and declare .override_template(...)

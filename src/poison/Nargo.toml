@@ -6,6 +6,8 @@ members = [
   "storage_shape_mismatch",
   "event_host_redeclares",
   "event_collision_across_templates",
+  "override_transitive_missing_direct_compose",
+  "override_transitive_collision_without_override",
 ]
 
 # Poison workspace: packages expected to FAIL compilation.
