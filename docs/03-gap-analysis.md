@@ -86,7 +86,8 @@ linearization, no implicit ordering.
 **Implications:**
 - Multi-compose is flat: all templates at the same level with equal precedence
 - Transitive flattening (G-1); all composed templates are recursively included by `compose()`
-- No override chain today (G-2); single-level replacement implemented in PR-3
+- No override chain today (G-2); single-level replacement implemented in PR-3. Overrides are
+  local to the host's compose list and must target a directly composed template id.
 - `super` does not apply: there is no "parent implementation" in a flat merge
 - All composed function names must be unique across the host and all composed templates
 

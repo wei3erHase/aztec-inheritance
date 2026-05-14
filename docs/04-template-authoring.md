@@ -280,7 +280,9 @@ fn fee_bps() -> u16 {
 
 ### 3. Keep replacements single-level
 
-Override is local to the host. There is no `super` chain in this MVP.
+Override is local to the host. A template cannot introduce an override for a function inherited
+through another composed template. The host must compose the overridden template ID directly and call
+`override_template()` on that ID. There is no `super` chain in this MVP.
 
 ---
 

@@ -8,6 +8,7 @@ members = [
   "event_collision_across_templates",
   "override_transitive_missing_direct_compose",
   "override_transitive_collision_without_override",
+  "override_transitive_partial_override",
 ]
 
 # Poison workspace: packages expected to FAIL compilation.
