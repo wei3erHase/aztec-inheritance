@@ -62,7 +62,7 @@ comptime fn flatten_template_keys(template_keys: [Field]) -> [Field] {
             };
 
             for child_key in child_template_keys {
-                if !contains_field(processed, child_key) {
+                if !contains_field(processed, child_key) & !contains_field(pending, child_key) {
                     pending = pending.push_back(child_key);
                 }
             }
