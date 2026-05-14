@@ -2,7 +2,7 @@ use crate::{test::utils, TransitiveOverrideHost};
 
 #[test]
 unconstrained fn transitive_child_override_works_when_overriden_id_is_directly_composed() {
-    let (env, _caller, host_address) = utils::setup();
+    let (env, _caller, host_address) = utils::setup_transitive();
     let host = TransitiveOverrideHost::at(host_address);
 
     // `virtual_mid_template` is transitive, and `virtual_template` is flattened;
