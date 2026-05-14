@@ -1,12 +1,13 @@
 # Aztec Contract Template Composition
 
-> **What this is:** A PoC comparing Solidity inheritance to Aztec contract composition  
-> **Status:** 12 of 18 Solidity inheritance features implemented; 3 out-of-scope; 1 by-design gap  
+> **What this is:** Production-focused validation of Solidity-style reuse via Aztec contract templates  
+> **Status:** Core behavior validated for macro-level composition features  
+> **Progress:** 12/18 implemented, 1 upstream-blocked gap, 2 BY_DESIGN, 3 OUT_OF_SCOPE  
 > **Mechanism:** Generic contract-template composition via vendored Aztec macro changes
 
 Solidity inheritance lets you write `contract Amm is ERC20 { ... }` and the host gets the full
-parent surface. This repo proves the equivalent is possible in Aztec without new Noir syntax --
-and measures exactly how close the two models are.
+parent surface. This repo validates how far that model can be implemented in Aztec without new Noir
+syntax -- and records the current behavior with executable proofs.
 
 See [docs/02-feature-matrix.md](docs/02-feature-matrix.md) for the full 18-hypothesis comparison.
 
@@ -36,12 +37,12 @@ src/
   composition_collision_fail/  Poison: name collision => fatal compile error (excluded from workspace)
 docs/
   01-architecture.md       How template composition works mechanically
-  02-feature-matrix.md     Solidity vs. Aztec: 18 hypotheses, all resolved (authoritative tracker)
+  02-feature-matrix.md     Solidity vs. Aztec: 18 hypotheses with current milestone status (authoritative tracker)
   03-gap-analysis.md       Root causes and decisions for every known gap
   04-template-authoring.md Rules for writing composable templates
   05-future-work.md        What remains: storage injection (blocked on Noir upstream)
   06-development-workflow.md  PR workflow, branch conventions, poison-pattern testing
-  archive/                 Superseded planning docs (historical reference)
+  07-design-decisions-and-progress.md  Agent inheritance playbook (good practices, no-gos, validation)
 ```
 
 ---
@@ -98,6 +99,15 @@ Full evidence table: [docs/02-feature-matrix.md](docs/02-feature-matrix.md)
   concept. This is architectural (BY_DESIGN), not a gap.
 - **Raw module-scope globals cannot be used in composable function bodies** -- use
   `#[contract_library_method]` for template-owned constants. See [docs/04-template-authoring.md](docs/04-template-authoring.md).
+
+---
+
+## Design decisions and milestone notes
+
+To keep the evolution story clean while removing historical folders, key design decisions and
+engineering tradeoffs are now consolidated in:
+
+- [docs/07-design-decisions-and-progress.md](docs/07-design-decisions-and-progress.md)
 
 ---
 

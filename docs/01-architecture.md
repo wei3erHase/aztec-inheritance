@@ -4,6 +4,16 @@
 > **Audience:** Developers integrating or extending the composition mechanism  
 > **Last updated:** 2026-05-13
 
+## 1) Agent lens: start here
+
+If you are implementing or reviewing inheritance-like behavior, first answer these 3 questions:
+
+1. Is this a **flat merge** effect or a **missing host requirement**?
+2. Does this depend on **names/visibility** from template internals?
+3. Is this an **upstream Noir blocker** in disguise?
+
+If you cannot answer (1) with explicit "copied/replayed surface" logic, do not assume any behavior.
+
 Template composition lets an Aztec contract be registered as a named template and then injected
 into a host contract, so the host behaves as if the template functions were written there directly.
 No new Noir syntax is required.
@@ -31,6 +41,12 @@ pub contract Amm { ... }
 ---
 
 ## Step-by-step flow
+
+Use this in code reviews:
+
+- Check that registration (`#[contract_template]`) and selection (`compose`) both happen.
+- Verify every host-facing requirement is either in storage, events, imports, or override metadata.
+- Trace registry state in `vendor/aztec/src/macros/template_registry.nr` for each claimed behavior.
 
 ### 1. Template registers itself
 
@@ -118,6 +134,20 @@ There is no dedicated validation pass today. Failures surface as normal type or 
 See [docs/04-template-authoring.md](04-template-authoring.md) for the explicit contract a template
 author must publish for host authors.
 
+### Host checklist before wiring a new template
+
+- Confirm required storage fields are copied from template docs into host `Storage`.
+- Confirm required traits/imports are available in host scope.
+- Confirm template init path (`internal`) is explicitly called by host constructor.
+- Confirm each composed public surface is intentional and collision-safe.
+- Confirm override entries (if any) are declared on a virtual function.
+
+### What to verify first when behavior is unclear
+
+- If a symbol fails to resolve in a composed body, classify it as host-scope binding mismatch first.
+- If storage field access fails, it is a host declaration gap unless field name/type was promised.
+- If the call graph appears to need a parent chain, classify it as non-goal unless `super` is implemented.
+
 ---
 
 ## Multi-template compose
@@ -150,6 +180,16 @@ a template and the host) are fatal unless an override is declared via
 
 See [docs/02-feature-matrix.md](02-feature-matrix.md) for the full evidence table, and
 [docs/03-gap-analysis.md](03-gap-analysis.md) for root causes and planned fixes.
+
+## Debug playbook for architecture regressions
+
+When a behavior unexpectedly changed:
+
+1. Verify the selected template IDs in `AztecConfig`.
+2. Inspect flattening path in `compose_template.nr` (`inject_template_functions_to_registries`).
+3. Check override metadata in config is matching the same template ID.
+4. Inspect replay source in `get_composed_templates_quoted`.
+5. Re-open the evidence package before touching the vendor implementation.
 
 ---
 

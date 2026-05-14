@@ -4,8 +4,24 @@
 > **Audience:** Developers and reviewers evaluating composition capability  
 > **Last updated:** 2026-05-13
 
-Every Solidity inheritance feature validated against Aztec template composition via executable
-proof (pass/fail). Zero hypotheses unresolved.
+## 1) Agent lens
+
+Use this table as the decision source for "is this behavior done".
+
+- `IMPLEMENTED`: we can reproduce it in an executable fixture.
+- `KNOWN_GAP`: blocked behavior with a known root cause.
+- `PLANNED_CHANGE`: doable at macro level but not yet implemented.
+- `BY_DESIGN`: intentionally different from Solidity inheritance.
+- `OUT_OF_SCOPE`: different model boundary.
+
+For each candidate change:
+
+1. Add/adjust a test (PASS or poison).
+2. Update the row status and keep evidence explicit.
+3. If the result is blocked, classify as `KNOWN_GAP` with a root-cause pointer.
+
+Every Solidity inheritance feature is validated against Aztec template composition via executable
+proof (pass/fail) with current implementation status tracked in this table.
 
 **Status labels:**
 - `IMPLEMENTED` -- works today, proven by a test
@@ -40,6 +56,18 @@ proof (pass/fail). Zero hypotheses unresolved.
 | 18 | Inheritable/overridable modifiers | N/A | Aztec uses function-level attributes (`#[only_self]`, `#[authorize_once]`); no modifier chain | **OUT_OF_SCOPE** |
 
 **Summary: 12 IMPLEMENTED, 0 PLANNED_CHANGE, 1 KNOWN_GAP, 2 BY_DESIGN, 3 OUT_OF_SCOPE, 0 UNRESOLVED**
+
+## 2) How to use the matrix during reviews
+
+When reviewing an implementation PR:
+
+- Confirm changed behavior is represented by at least one matrix row.
+- Confirm the row points to a runnable evidence package (`composition_*`) or a manual poison path.
+- Confirm no contradictory status remains between this table and the gap/workflow docs.
+- If a row changes status, coordinate corresponding updates in:
+  - [docs/03-gap-analysis.md](03-gap-analysis.md)
+  - [docs/04-template-authoring.md](04-template-authoring.md)
+  - [docs/05-future-work.md](05-future-work.md)
 
 ---
 
@@ -82,6 +110,13 @@ Overrides are **host-only and single-level**: a template cannot declare a replac
 defined by a composed template without `.override_template(...)` in the host config.
 See [docs/05-future-work.md](05-future-work.md) M4 for the design.
 
+## 3) Evidence quality rule
+
+Each "PASS" row should remain reproducible with deterministic evidence and not rely on comments.
+Each "KNOWN_GAP" row should describe why behavior is blocked and which upstream/API limitation causes it.
+Each "OUT_OF_SCOPE/BY_DESIGN" row should include a short rationale that references model boundaries
+(`merge-and-replay`, `host-owned storage`, `single-level override`, etc.).
+
 ---
 
 ## Evidence packages
@@ -95,6 +130,23 @@ See [docs/05-future-work.md](05-future-work.md) M4 for the design.
 | `composition_collision_fail` | `src/composition_collision_fail` | #9 (poison -- excluded from workspace) |
 | `composition_override` | `src/composition_override` | #10, #16 (virtual override and template-overridable composition) |
 | `amm_token` | `src/amm_token` | #7, #14 |
+
+## Negative evidence (antipattern fixtures)
+
+Poison paths are not ignored—they are part of the contract of merge-and-replay and are tracked under `src/poison/*`.
+
+| Pattern | Proof package | Why this matters |
+|---|---|---|
+| Direct selector collision | `collision_no_override` | Confirms function names are unique in the host-level merged surface |
+| Storage slot absent | `missing_storage_var` | Confirms host-owned storage requirements are mandatory |
+| Storage slot shape mismatch | `storage_shape_mismatch` | Confirms shared-name/type alignment is enforced |
+| Transitive duplicate selector | `transitive_diamond_leaf_collision`, `transitive_diamond_leaf_collision_reverse` | Confirms flattening does not bypass selector safety |
+| Host redeclares template event | `event_host_redeclares` | Confirms replayed event declarations are authoritative |
+| Event collision across composed templates | `event_collision_across_templates` | Confirms event namespaces stay singleton across flattened composition |
+| Host global resolution gap | `host_global_scope_resolved_limit` | Confirms template module globals do not auto-bind into host scope |
+| Override target not directly composed | `override_transitive_missing_direct_compose` | Confirms override binding requires direct template ID composition |
+| Partial override in collision set | `override_transitive_partial_override` | Confirms all colliding virtual sources must be handled |
+| Missing local override path | `override_mid_template_local_fee_bps`, `override_transitive_collision_without_override` | Confirms override contract remains host-explicit |
 
 ---
 

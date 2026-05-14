@@ -4,34 +4,35 @@
 > **Audience:** Developers writing composable Aztec contract templates  
 > **Last updated:** 2026-05-13
 
-Rules for writing a contract template that composes cleanly into a host. These rules exist because
-composition is **merge-and-replay**, not Solidity-style inheritance -- the host's scope is the
-resolution context for all injected function bodies.
+## 0) Agent mindset
+
+Treat this repo as a **composition operator**, not classical inheritance.
+The core mental model:
+
+1. Templates contribute callable fragments.
+2. Host contributes runtime context, storage, imports, and bindings.
+3. Override and collision rules are explicit and compile-time enforced.
+
+When a request cannot be mapped to this model, it is likely a follow-on design discussion.
 
 ---
 
-## Core contract
+## 1) Core assumptions
 
-**The host module is the resolution context.** Every identifier in a composed function body --
-global names, storage fields, event types, trait methods, helper functions -- must resolve in the
-host module at injection time. The template's own scope does not carry over.
+**Host module is the resolution context** for every composed function body.
 
-This drives the template authoring model:
+Global names, storage fields, imports, traits, and event types used by composed bodies must be
+available in host scope at injection time.
 
-1. Global names in composable bodies are **host-provided bindings** -- the host decides the value
-2. Template-owned constants must go through `#[contract_library_method]` (not raw globals)
-3. Event structs referenced in composed bodies are replayed automatically from template declarations
-4. Storage fields referenced in composed bodies must be declared in the host
-5. Trait imports needed by composed bodies must be present in the host
-6. All composed function names must be unique across the host and all composed templates
+This means templates should be explicit about what the host must provide.
 
 ---
 
-## Template author rules
+## 2) Template author rules
 
-### 1. Register with `#[contract_template("id")]`
+### 2.1 Register with `#[contract_template("id")]`
 
-Place the template in its own crate. Apply `#[contract_template("id")]` before `#[aztec]`:
+Place template in its own crate.
 
 ```noir
 #[contract_template("my_template")]
@@ -39,21 +40,21 @@ Place the template in its own crate. Apply `#[contract_template("id")]` before `
 pub contract MyTemplate { ... }
 ```
 
-The id string is how hosts reference this template. Choose a stable, unique, human-readable id.
+Use a stable, unique id.
 
-### 2. Use only composable function kinds
+### 2.2 Compose only supported function kinds
 
-Functions that compose cleanly:
+Use these for function kinds that participate in merge-and-replay:
 
-| Kind | Annotation | How it migrates |
+| Kind | Annotation | Migration |
 |---|---|---|
-| External public/private/utility | `#[external("public")]` etc. | Body captured as `Quoted`, replayed in host |
-| Internal public/private | `#[internal("public")]` etc. | Body captured as `Quoted`, replayed in host |
-| Library helper | `#[contract_library_method]` | Migrated via `f.as_typed_expr()` -- no body tokens |
+| External | `#[external("public")]`, etc. | Captured as `Quoted` and replayed in host |
+| Internal | `#[internal("public")]`, etc. | Captured as `Quoted` and replayed in host |
+| Helper | `#[contract_library_method]` | Migrates via typed expression (`f.as_typed_expr()`), safest for cross-crate constants/helpers |
 
-### 2b. Mark overridable template methods
+### 2.3 Decide override intent explicitly
 
-Add `#[template_virtual]` to any external function that a host may replace.
+Add `#[template_virtual]` to any external function a host may replace.
 
 ```noir
 use aztec::macros::functions::{external, template_virtual, view};
@@ -66,192 +67,123 @@ fn fee_bps() -> u16 {
 }
 ```
 
-The function is still implemented normally in the template. The host replaces it with
-`override_template("template_id", "fee_bps")` and its own same-signature function body.
+Host replacement requires compose config:
 
-Guidance:
+```noir
+AztecConfig::new().compose("my_template").override_template("my_template", "fee_bps")
+```
 
-- Non-virtual template functions cannot be overridden.
-- A host override must match the full signature (name + parameter types).
-- A template where all external methods are virtual is an abstract template by convention.
+Rules:
 
-### 3. Two patterns for constants: template-owned vs host-provided
+- Non-virtual methods cannot be overridden.
+- Host override signature must match target method signature.
+- Abstract behavior is convention-driven: all externals are virtual + host overrides all.
 
-There is no way for a template to self-reference its own module globals in composable function
-bodies. The body is elaborated by `#[aztec]` during template compilation inside the contract block
-context, where module-scope globals are not accessible. (If Noir gains `crate::` self-reference in
-comptime contexts, stable qualified paths would fix this.)
+### 2.4 Separate constants by ownership intent
 
-**Pattern A -- template-owned constant (fixed value, implementation detail):**
-Use `#[contract_library_method]`. These migrate via `f.as_typed_expr()` (a typed reference to the
-original function) and always resolve correctly, cross-crate:
+**Template-owned constants/behaviors:** use `#[contract_library_method]`.
 
 ```noir
 #[contract_library_method]
 fn _initial_notes() -> u32 { 2 }
 
 #[external("public")]
-fn do_thing() {
-    let n = _initial_notes();  // resolves via typed reference, always works
+fn do_thing() -> u32 {
+    _initial_notes()
 }
 ```
 
-**Pattern B -- host-provided binding (parameterizable, host decides the value):**
-Reference the name unqualified in the body. The name resolves in host scope at injection time.
-Document it as a host requirement. The host can import it from the template's crate or declare its
-own:
+**Host-configurable values:** use unqualified symbol references in body and document them as host
+requirements.
 
 ```noir
-// Template: body references FOO_CONFIG -- host must provide this name
 #[external("public")]
 fn use_config() -> u32 {
-    FOO_CONFIG  // host-scope binding; template does not define this
+    FOO_CONFIG
 }
+```
 
-// Host option A: import from the template crate
+Host can import or define:
+
+```noir
 use my_template::FOO_CONFIG;
-
-// Host option B: override with a local value
+// or
 pub global FOO_CONFIG: u32 = 99;
 ```
 
-This makes templates parameterizable: the host is not locked into the template's value, it
-decides what each host-expected global contains. Publish the list of host-provided bindings in
-the template's host requirements document (see rule 4).
+### 2.5 Publish host requirements
 
-**Guidance on choosing the pattern:**
+Every template should document:
 
-| Intent | Use |
-|---|---|
-| Fixed implementation constant (host must not change it) | `#[contract_library_method]` (Pattern A) |
-| Configurable constant (host sets the value) | Host-provided binding (Pattern B) |
-| Future: immutable at deploy time | Awaiting an `#[immutable]`-style macro |
+- required storage fields and types,
+- required imports/traits,
+- template init internal call.
 
-If you want to expose a global as part of the template's public API (so the host CAN import it),
-declare it in a dedicated module and ensure it is accessible via a fully-qualified path. Do NOT
-count on the host using your template's version -- the host may override the binding with its own
-value. If immutable behavior matters, enforce it through `#[contract_library_method]`, which
-cannot be overridden by the host.
-
-### 4. Publish a host requirements document
-
-Hosts cannot figure out what they need by looking at the template's ABI alone. You must document:
-
-- **Storage fields:** every field name and type that composed bodies reference via `self.storage.*`
-- **Imports/traits:** any trait or import that composed bodies need in the host's `use` block
-- **Initializer call:** the composed internal the host constructor must call, and the parameters
-
-Example for the AIP-20 token template:
+Example:
 
 ```
-Storage fields required in host:
-  name: PublicImmutable<FieldCompressedString, Context>
-  symbol: PublicImmutable<FieldCompressedString, Context>
-  decimals: PublicImmutable<u8, Context>
-  private_balances: Owned<BalanceSet<Context>, Context>
-  total_supply: PublicMutable<u128, Context>
-  public_balances: Map<AztecAddress, PublicMutable<u128, Context>, Context>
-  minter: PublicImmutable<AztecAddress, Context>
+Storage fields:
+- name: PublicImmutable<FieldCompressedString, Context>
+- symbol: PublicImmutable<FieldCompressedString, Context>
+- decimals: PublicImmutable<u8, Context>
 
-Imports required in host:
-  use aztec::protocol::traits::FromField;
+Imports:
+- use aztec::protocol::traits::FromField;
 
-Initializer:
-  Call self.internal._initialize_token(TokenInitParams { name, symbol, decimals, minter })
-  from the host's own constructor.
+Init:
+- call self.internal._initialize_token(TokenInitParams { ... })
 ```
 
-### 5. Use name prefixes to avoid collisions
+### 2.6 Naming to avoid accidental collisions
 
-Since unmarked collisions remain fatal, use template-specific prefixes:
+Use namespace prefixing:
 
-- External functions: `foo_get()`, `foo_increment()` (not `get()`, `increment()`)
-- Internal helpers: `_foo_set()`, `_foo_validate()` (underscore + prefix)
-- Library methods: `_foo_magic()` (same convention)
-- Events: `FooEvt`, `FooTransfer` (not `Evt`, `Transfer` unless sharing a canonical event)
-
-### 6. Declare the initializer as an internal
-
-The initialization path for a template should be a `#[internal("public")]` function, not a
-`#[initializer]` on the host. This keeps the host in control of its own constructor:
-
-```noir
-// Template: internal init, not an initializer
-#[internal("public")]
-fn _initialize_token(params: TokenInitParams) {
-    self.storage.name.initialize(FieldCompressedString::from_string(params.name));
-    // ...
-}
-
-// Host: own initializer calls the composed internal
-#[initializer]
-#[external("public")]
-fn constructor(name: str<31>, ...) {
-    self.internal._initialize_token(TokenInitParams { name, ... });
-    // host-specific init
-}
-```
+- `foo_get()`, `foo_set()` for externals
+- `_foo_validate()` for internals
+- `_foo_magic()` for library methods
+- `FooEvt` for events
 
 ---
 
-## Host author rules
+## 3) Host author rules
 
-### 1. Compose template entry points (transitive closure is automatic)
-
-Compose chains are flattened recursively. If `mid_template` composes `foo_template` internally,
-composing `mid_template` also includes `foo_template` and its transitive dependencies automatically:
+### 3.1 Compose entry points
 
 ```noir
 #[aztec(AztecConfig::new().compose("foo_template").compose("bar_template"))]
+pub contract Host { ... }
 ```
 
-### 2. Declare all required storage fields
+Transitive templates compose automatically when a template composes another template.
 
-Copy the template's storage requirements into your host's Storage struct. Order is your choice;
-slots are assigned by declaration order in `Storage::init`.
+### 3.2 Declare storage required by templates
+
+Host declares every required storage field. Slot order is host-owned.
 
 ```noir
 #[storage]
 struct Storage<Context> {
-    // foo_storage template fields (required by composed function bodies)
     foo_counter: PublicMutable<u32, Context>,
-    // host-specific fields
-    my_field: PublicMutable<u64, Context>,
+    bar_counter: PublicMutable<u32, Context>,
 }
 ```
 
-### 3. Event structs are auto-replayed
+### 3.3 Event structs
 
-Template event structs marked `#[event]` are now replayed into the host during compose, so hosts do not
-redeclare them unless customization is intentionally required.
+Event structs from template declarations are replayed by compose.
+No manual redeclare is required unless host intentionally wants a custom shape.
 
-### 4. Call the template's init internal from your constructor
+### 3.4 Run template init from host constructor
 
 ```noir
 #[initializer]
 #[external("public")]
-fn constructor(name: str<31>, symbol: str<31>, decimals: u8, token_a: AztecAddress, ...) {
-    self.internal._initialize_token(TokenInitParams { name, symbol, decimals, minter: self.context.this_address() });
-    self.storage.token_a.initialize(token_a);
-    // ...
+fn constructor(...) {
+    self.internal._initialize_token(TokenInitParams { ... });
 }
 ```
 
-### 5. Document your composed surface
-
-Add a header comment listing your composed templates and what they provide:
-
-```noir
-// Composed templates:
-//   aip20_token -- full AIP-20 token surface (transfer, mint, burn, balance views)
-// Host-declared storage: token fields (name, symbol, ...) + AMM fields (reserve_a, reserve_b, ...)
-// Host-declared events: Transfer
-// Required by template: FromField trait import
-```
-
-## Host override rules
-
-### 1. Declare overrides in `AztecConfig`
+### 3.5 Keep override local and explicit
 
 ```noir
 use aztec::macros::AztecConfig;
@@ -264,12 +196,6 @@ use aztec::macros::AztecConfig;
 pub contract Host {
     ...
 }
-```
-
-### 2. Provide the replacement body in the host contract
-
-```noir
-use aztec::macros::functions::{external, view};
 
 #[external("public")]
 #[view]
@@ -278,23 +204,49 @@ fn fee_bps() -> u16 {
 }
 ```
 
-### 3. Keep replacements single-level
-
-Override is local to the host. A template cannot introduce an override for a function inherited
-through another composed template. The host must compose the overridden template ID directly and call
-`override_template()` on that ID. There is no `super` chain in this MVP.
+No `super` semantics exist in this model.
 
 ---
 
-## Quick checklist before opening a PR
+## 4) Anti-patterns you should document as poison cases
 
-- [ ] Template functions use only `#[external]`, `#[internal]`, `#[contract_library_method]`
-- [ ] No raw module-scope globals referenced in composable function bodies
-- [ ] Template has a published host requirements document (storage fields, imports, init call)
-- [ ] All template function/event names are prefixed to avoid collisions
-- [ ] Host declares all required storage fields from every composed template
-- [ ] Validate that required events are replayed from composed templates (no manual redeclare needed)
-- [ ] Host constructor calls `_initialize_<template>()` for every composed template that requires init
-- [ ] All directly composed template ids are intentionally chosen (transitive dependencies are auto-included)
-- [ ] A positive surface test exists (composed externals callable)
-- [ ] A negative collision test or naming convention prevents accidental name overlap
+Treat these as first-class cases when a new template abstraction is added.
+
+| Pattern | Why it is an issue | Example fixture |
+|---|---|---|
+| Host omitted required storage slot | Composition will compile-check into host-owned storage and fail at composed body type-check (`foo_counter` missing) | `missing_storage_var` |
+| Host declared slot with wrong shape | Same symbol name but type mismatch produces field/type errors and should be part of migration planning | `storage_shape_mismatch` |
+| Host relies on template module globals | Raw globals are resolved in host scope; template-module-only globals are not inherited | `host_global_scope_resolved_limit`, `foo_raw_global_template` |
+| Template emits `FooEvt` and host redeclares same `FooEvt` | Event replay makes duplicate event type definitions a compile error | `event_host_redeclares` |
+| Two composed templates own same event type | Flattening + event replay keeps namespace singletons, so duplicate event names collide | `event_collision_across_templates` |
+| Missing direct override target | `override_template(id, fn)` must point to a template id explicitly composed by the host | `override_transitive_missing_direct_compose` |
+| Partial override in collision set | Any virtual function left un-overridden in the composed surface still collides | `override_transitive_partial_override` |
+| Mid-template local selector collision with inherited virtual | Local template function can conflict with composed virtual without host override config | `override_mid_template_local_fee_bps` |
+| Transitive duplicate selector | Duplicate selectors from transitive flattening still fail compilation (`leaf_value`) | `transitive_diamond_leaf_collision`, `transitive_diamond_leaf_collision_reverse` |
+| Direct template collision path | Directly composing two templates with same external selector remains a hard error | `collision_no_override` |
+
+How to use this table:
+
+- If you touch behavior in this area, keep or add the matching poison case.
+- When a fixture is not in automated CI, leave it documented here with explicit manual run command.
+
+---
+
+## 5) Agent review checklist (must pass)
+
+- [ ] All composable functions are `external`, `internal`, or `contract_library_method`
+- [ ] No unresolved template-only globals inside composable bodies
+- [ ] Host requirements doc exists and includes storage + imports + init call
+- [ ] Host storage fields match template names/types
+- [ ] Event replay is validated (or intentional override documented)
+- [ ] Every override is declared on `compose`d virtual target with matching signature
+- [ ] Collision prevention strategy is documented in template/host naming
+- [ ] Positive fixture + negative/poison path exist for changed behavior
+
+## 6) Common footguns to flag early
+
+- Assuming private scope from composed functions: composition is flat merge.
+- Forgetting host imports for composed trait methods.
+- Overusing direct globals for implementation constants.
+- Treating duplicate storage names as harmless when shapes differ.
+- Expecting chain/linearization behavior in override calls.

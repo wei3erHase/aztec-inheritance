@@ -1,6 +1,6 @@
 # Roadmap: Aztec Contract Template Composition
 
-> **Status:** M4 complete -- all planned PoC features implemented  
+> **Status:** M4 complete -- all planned composition features implemented  
 > **Last updated:** 2026-05-13
 
 ---
@@ -10,14 +10,14 @@
 | ID | Milestone | Status | Notes |
 |----|-----------|--------|-------|
 | M0 | ADR + workspace setup | Done | Workspace, repo isolation, initial architecture decisions |
-| M2 | Generic template composition PoC + test scaffold | Done | Generic vendor machinery; token mixin as first consumer; all 18 hypotheses validated |
+| M2 | Generic template composition + executable test scaffold | Done | Generic vendor machinery; token mixin as first consumer; all 18 hypotheses validated |
 | M3 | Basic test surface | Done | Core behavior tests pass; full parity not planned |
 | M4 | Virtual/override mechanism + abstract templates | Done | `#[template_virtual]` + `override_template(...)` in `AztecConfig`; `composition_override` evidence package |
 | M5 | Docs, migration guide, security review | Planned | After M4 |
 
 ---
 
-## Current state (post-M2)
+## Current state (post-M4)
 
 **What was built:**
 
@@ -42,6 +42,15 @@ aztec test    # 4 amm_token tests pass; composition_multi + composition_transiti
 |----|-----------|--------|
 | G-4 | Host must manually declare all template storage fields | Blocked on Noir `TypeDefinition::add_field`; design sketch in docs/05-future-work.md |
 
+## Current status note
+
+Milestone focus is now on stable behavior and operational documentation. The repo is still explicit
+about remaining model boundaries:
+- flat, explicit merge-and-replay composition
+- host-owned storage and host-scope symbol binding
+- single-level virtual/override only
+- no automatic `super` chain, no automatic storage injection
+
 ### 2026-05-13 -- PR-3 virtual/override shipped
 
 `#[template_virtual]` attribute marks template external functions as overridable. Hosts use
@@ -60,6 +69,14 @@ from composed templates. Closes G-3. Implements matrix #13.
 
 Transitive composition is now implemented by recursive flattening at compose expansion (`mid_template` includes its
 own transitive dependencies). This closes G-1 in `docs/03-gap-analysis.md`.
+
+### 2026-05-13 -- consolidation and production documentation pass
+
+Archive planning docs were consolidated into a single milestone artifact:
+- `docs/07-design-decisions-and-progress.md`
+
+That file is now the design/source-of-history checkpoint for assumptions, what is intentionally
+implemented, what is intentionally not implemented, and what remains upstream-only.
 
 ---
 
