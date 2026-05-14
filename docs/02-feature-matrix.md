@@ -27,7 +27,7 @@ proof (pass/fail). Zero hypotheses unresolved.
 | 5 | Composed internal writes host storage field | PASS | `composition_host`: `host_set_and_get(99)` via `self.internal._foo_set(99)` returns 99 | **IMPLEMENTED** |
 | 6 | Library method constant migrated cross-crate | PASS | `composition_host`: `host_library_constant()` == 42; `foo_magic_via_helper()` == 42 | **IMPLEMENTED** |
 | 7 | Constructor/initializer chain | PASS | `amm_token`: constructor calls `self.internal._initialize_token(TokenInitParams {...})` | **IMPLEMENTED** |
-| 8 | Composing a transitive template does not silently flatten grandchild functions | SILENT FAIL | `composition_transitive`: `foo_value()` silently absent; no compiler warning | **KNOWN_GAP** |
+| 8 | Transitive composition flattens grandchild templates | PASS | `composition_transitive`: `mid_value()`, `foo_value()`, and `bar_value()` are all callable | **IMPLEMENTED** |
 | 9 | Function name collision is a hard compile error | PASS | `composition_collision_fail`: "selector collision between foo_value and foo_value" at dispatch generation | **IMPLEMENTED** |
 | 10 | Host can override a specific template function | PASS | `composition_override`: `fee_bps()` is implemented in host and overrides template default | **IMPLEMENTED** |
 | 11 | `super` call to base implementation | N/A | Compose is flat/non-hierarchical; there is no base, no chain, no `super` concept | **OUT_OF_SCOPE** |
@@ -39,19 +39,16 @@ proof (pass/fail). Zero hypotheses unresolved.
 | 17 | `private` function inaccessible to host (Solidity visibility) | N/A | Compose copies quoted function bodies, not Solidity-style imports. There is no private scope in the copy model -- all composed functions are visible to the host | **OUT_OF_SCOPE** |
 | 18 | Inheritable/overridable modifiers | N/A | Aztec uses function-level attributes (`#[only_self]`, `#[authorize_once]`); no modifier chain | **OUT_OF_SCOPE** |
 
-**Summary: 11 IMPLEMENTED, 0 PLANNED_CHANGE, 3 KNOWN_GAP, 2 BY_DESIGN, 3 OUT_OF_SCOPE, 0 UNRESOLVED**
+**Summary: 12 IMPLEMENTED, 0 PLANNED_CHANGE, 1 KNOWN_GAP, 2 BY_DESIGN, 3 OUT_OF_SCOPE, 0 UNRESOLVED**
 
 ---
 
 ## Notes on selected entries
 
-### #8 -- transitive composition: silent fail is the real problem
+### #8 -- transitive composition is now flattened
 
-The behavior itself is correct by design (see D-1 in gap analysis). The problem is user experience:
-composing `mid_template` produces no warning that `foo_template` and `bar_template` functions are
-NOT included. Planned improvement: emit a compiler warning when `inject_template_functions_to_registries`
-detects that a selected template itself has composed templates (indicating the developer may have
-expected transitive flattening).
+Composing a template now recursively injects transitive dependencies, so grandchild template functions are
+made available automatically.
 
 ### #12 -- globals are host-scope bindings, not template-owned statics
 
@@ -112,7 +109,7 @@ Aztec template composition is **merge-and-replay**, not Solidity `is`-based inhe
 | Name collision detection (hard error) | Yes |
 | Virtual/override single function | Yes (`#10`) |
 | Abstract templates | Yes (`#16`; convention now documented) |
-| Transitive template flattening | No (accepted; warn on silent skip is planned) |
+| Transitive template flattening | Yes |
 | Automatic event struct injection | No (language-blocked) |
 
 Root causes and decisions for known gaps: [docs/03-gap-analysis.md](03-gap-analysis.md)

@@ -28,7 +28,7 @@ src/
   amm_token/               Host contract: Amm = AMM pool + full token at one address
   composition_fixtures/    Minimal foo/bar/mid/storage templates for hypothesis testing
   composition_multi/       Proof: multi-template compose works
-  composition_transitive/  Proof: transitive compose is NOT flattened (known gap)
+  composition_transitive/  Proof: transitive compose is flattened
   composition_host/        Proof: storage + events + library constants via compose
   composition_collision_fail/  Poison: name collision => fatal compile error (excluded from workspace)
 docs/
@@ -84,7 +84,6 @@ See [docs/02-feature-matrix.md](docs/02-feature-matrix.md) for the complete 18-h
 - Host must declare all template storage fields manually (Noir lacks `TypeDefinition::add_field`)
 - Event structs used in composed bodies must be re-declared in the host
 - No virtual/override: same-name collision is a fatal compile error
-- Transitive composition is not flattened (must list all templates explicitly)
 - Raw module-scope globals cannot be used in composable function bodies
 
 See [docs/03-gap-analysis.md](docs/03-gap-analysis.md) for root causes and workarounds.

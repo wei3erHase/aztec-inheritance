@@ -2,7 +2,8 @@ use aztec::macros::{aztec, AztecConfig, contract_template};
 
 /// Template that composes other templates via #[aztec(...)] compose.
 ///
-/// This template composes other templates directly.
+/// In the current implementation, composition is flattened recursively, so a host that
+/// composes only `mid_template` also receives its composed dependencies.
 #[contract_template("mid_template")]
 #[aztec(AztecConfig::new().compose("foo_template").compose("bar_template"))]
 pub contract MidTemplate {

@@ -130,7 +130,25 @@ pub comptime fn aztec(m: Module, args: [AztecConfig]) -> Quoted {
         panic(f"#[aztec] expects 0 or 1 arguments, got {num_args}")
     };
 
-    template_registry::register_composed_template_ids(m, config.composed_templates);
+    let mut self_template_key = template_registry::get_template_key_by_module(m);
+    if !self_template_key.is_some() {
+        self_template_key = template_registry::get_template_key_by_module_name_hash(template_registry::module_name_key(m));
+    }
+
+    // Record template composition by module too, so transitive composition can be recovered
+    // even when template-key lookup is unavailable at this compilation phase.
+    if config.composed_templates.len() > 0 {
+        template_registry::register_template_composed_keys_for_module(m, config.composed_templates);
+    }
+
+    if self_template_key.is_some() {
+        // Record the template's own transitive dependency list so hosts flattening this template
+        // also get its composed children.
+        template_registry::register_template_composed_keys(
+            self_template_key.unwrap(),
+            config.composed_templates,
+        );
+    }
 
     let template_override_signatures: Option<[(Field, Field)]> = if config.template_overrides.len() > 0 {
         Option::some(compute_template_override_signatures(

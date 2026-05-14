@@ -2,7 +2,7 @@
 //!
 //! This module provides:
 //! 1. override validation (`compute_template_override_signatures`)
-//! 2. external registry injection with override-aware skipping
+//! 2. external registry injection with override-aware skipping, using transitive flattening
 //! 3. quoted replay of non-overridden composed template functions
 
 use crate::macros::{
@@ -41,15 +41,16 @@ comptime fn contains_field(values: [Field], value: Field) -> bool {
     for existing in values {
         if existing == value {
             found = true;
-            break;
         }
     }
     found
 }
 
+// Returns all template ids reachable from `template_keys`, preserving first-seen order and
+// deduplicating entries as they are discovered.
 comptime fn flatten_template_keys(template_keys: [Field]) -> [Field] {
-    let mut processed = @[];
     let mut pending = template_keys;
+    let mut processed = @[];
 
     let mut index = 0;
     while index < pending.len() {
@@ -59,15 +60,27 @@ comptime fn flatten_template_keys(template_keys: [Field]) -> [Field] {
             template_module_opt.is_some(),
             "compose: no contract template registered for one of the requested template ids",
         );
+        let template_module = template_module_opt.unwrap();
 
         if !contains_field(processed, template_key) {
             processed = processed.push_back(template_key);
 
-            let template_module = template_module_opt.unwrap();
-            let child_template_ids =
-                template_registry::get_template_composed_template_ids(template_module).unwrap_or(@[]);
-            for child_template_key in child_template_ids {
-                pending = pending.push_back(child_template_key);
+            let composed_keys_opt = template_registry::get_template_composed_keys(template_key);
+            let mut child_template_keys = if composed_keys_opt.is_some() {
+                composed_keys_opt.unwrap()
+            } else {
+                let module_composed_keys_opt = template_registry::get_template_composed_keys_by_module(template_module);
+                if module_composed_keys_opt.is_some() {
+                    module_composed_keys_opt.unwrap()
+                } else {
+                    @[]
+                }
+            };
+
+            for child_key in child_template_keys {
+                if !contains_field(processed, child_key) & !contains_field(pending, child_key) {
+                    pending = pending.push_back(child_key);
+                }
             }
         }
 
@@ -199,53 +212,51 @@ pub(crate) comptime fn inject_template_functions_to_registries(
         host_signature_map.insert(function_signature_key(f), true);
     }
 
-    let template_keys = flatten_template_keys(template_keys);
-    for template_key in template_keys {
+    for template_key in flatten_template_keys(template_keys) {
         let template_module_opt = template_registry::get_template_module(template_key);
         assert(
             template_module_opt.is_some(),
             "compose: no contract template registered for one of the requested template ids",
         );
-
         let template_module = template_module_opt.unwrap();
 
         for f in external_functions_registry::get_own_private_functions(template_module) {
             let signature_key = function_signature_key(f);
-        if has_override(template_key, signature_key, override_signatures) {
-            continue;
-        }
-        if host_signature_map.get(signature_key).is_some() {
-            panic(
-                "compose: host function selector collision; mark template function as #[template_virtual] and declare .override_template(...)."
-            );
-        }
-        external_functions_registry::add_composed_private(host, f);
+            if has_override(template_key, signature_key, override_signatures) {
+                continue;
+            }
+            if host_signature_map.get(signature_key).is_some() {
+                panic(
+                    "compose: host function selector collision; mark template function as #[template_virtual] and declare .override_template(...)."
+                );
+            }
+            external_functions_registry::add_composed_private(host, f);
         }
 
         for f in external_functions_registry::get_own_public_functions(template_module) {
             let signature_key = function_signature_key(f);
-        if has_override(template_key, signature_key, override_signatures) {
-            continue;
-        }
-        if host_signature_map.get(signature_key).is_some() {
-            panic(
-                "compose: host function selector collision; mark template function as #[template_virtual] and declare .override_template(...)."
-            );
-        }
-        external_functions_registry::add_composed_public(host, f);
+            if has_override(template_key, signature_key, override_signatures) {
+                continue;
+            }
+            if host_signature_map.get(signature_key).is_some() {
+                panic(
+                    "compose: host function selector collision; mark template function as #[template_virtual] and declare .override_template(...)."
+                );
+            }
+            external_functions_registry::add_composed_public(host, f);
         }
 
         for f in external_functions_registry::get_own_utility_functions(template_module) {
             let signature_key = function_signature_key(f);
-        if has_override(template_key, signature_key, override_signatures) {
-            continue;
-        }
-        if host_signature_map.get(signature_key).is_some() {
-            panic(
-                "compose: host function selector collision; mark template function as #[template_virtual] and declare .override_template(...)."
-            );
-        }
-        external_functions_registry::add_composed_utility(host, f);
+            if has_override(template_key, signature_key, override_signatures) {
+                continue;
+            }
+            if host_signature_map.get(signature_key).is_some() {
+                panic(
+                    "compose: host function selector collision; mark template function as #[template_virtual] and declare .override_template(...)."
+                );
+            }
+            external_functions_registry::add_composed_utility(host, f);
         }
 
         for f in internal_functions_registry::get_own_private_functions(template_module) {

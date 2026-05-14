@@ -10,23 +10,20 @@ explained inline in the matrix.
 
 ---
 
-## G-1: Transitive composition is not flattened (silent fail)
+## G-1: Transitive composition is flattened
 
-**Gap:** Composing a template that itself composes others does NOT include grandchild functions
-in the host. Only direct template functions are injected. The compiler emits no warning -- the
-host simply does not get those functions, which can be surprising.
+**Status:** Implemented (PR-1).
 
-**Root cause:** `inject_template_functions_to_registries` iterates the requested template keys
-and injects only their own `FunctionDefinition`s. It does not recurse into what those templates
-themselves composed.
+**Implementation:** Composing a template now recursively injects all transitive template functions.
+Function-name collisions still follow existing compose collision rules.
 
-**Evidence:** `composition_transitive` -- `mid_value()` is callable (direct template function),
-`foo_value()` is silently absent (grandchild, not flattened).
+**Root cause (historical):** `inject_template_functions_to_registries` previously only injected
+the directly composed templates and ignored their dependencies.
 
-**Decision:** The non-flattening behavior is correct and intentional (D-1 below). The silent fail
-is the problem. Planned fix: emit a compiler warning when `inject_template_functions_to_registries`
-detects that a selected template itself has composed templates, so the developer knows transitive
-functions are NOT included.
+**Evidence:** `composition_transitive` -- `mid_value()`, `foo_value()`, and `bar_value()` are all
+callable from the host.
+
+**Decision:** PR-1 implemented recursive expansion and removed this gap.
 
 **Solidity equivalent:** `C is B, A` flattens the full hierarchy. Gap on flattening is accepted;
 the warning closes the UX gap.
@@ -35,7 +32,8 @@ the warning closes the UX gap.
 
 ## G-2: No virtual/override mechanism (resolved)
 
-**Gap:** resolved by PR-3
+**Gap:** resolved by PR-3. Template external functions can be marked `#[template_virtual]`, and hosts
+can replace them via `override_template("template_id", "fn_name")` in `AztecConfig`.
 
 **Resolution:** Template external functions can be marked `#[template_virtual]`, and hosts can replace
 them by declaring `override_template("template_id", "fn_name")` in `AztecConfig`.
@@ -90,7 +88,7 @@ linearization, no implicit ordering.
 
 **Implications:**
 - Multi-compose is flat: all templates at the same level with equal precedence
-- No transitive flattening (G-1); developer must list all templates explicitly
+- Transitive flattening (G-1); all composed templates are recursively included by `compose()`
 - No override chain today (G-2); single-level replacement implemented in PR-3
 - `super` does not apply: there is no "parent implementation" in a flat merge
 - All composed function names must be unique across the host and all composed templates
@@ -178,6 +176,39 @@ in `Nargo.toml`. They exist in `src/` as documentation and manual test evidence.
 nargo check --package composition_collision_fail_contract
 # Expected: "Public function selector collision detected"
 ```
+
+---
+
+## D-5: Template ID collision is a silent last-writer-wins overwrite
+
+**Behavior:** `register_template` calls `CHashMap::insert` with no existence check. If two modules
+register the same template ID string, the second registration silently overwrites the first across
+all registry maps (`TEMPLATE_MODULES`, `TEMPLATE_FUNCTIONS_QUOTED`, `TEMPLATE_ABI_EXPORTS_QUOTED`,
+`TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED`, `TEMPLATE_COMPOSED_KEYS`, …).
+
+**Elaboration order determines the winner:**
+- Same crate: `mod` declaration order — the module declared later wins.
+- Cross-crate: Noir elaborates dependencies before dependents. The root crate (typically the
+  host's crate) elaborates last and overwrites any library registration with the same ID.
+
+**Why this matters:** The dangerous scenario is a user accidentally reusing a library template ID.
+Their crate is the dependent, so it elaborates last, silently replaces the library template, and
+the host composes the wrong module with no error or warning.
+
+**Current status:** No guard exists. `register_template` does not assert on duplicate keys.
+
+**Legitimate use case — version pinning:** If A composes B and C, and both transitively pull in
+different implementations of the same interface registered under the same ID (call them D and D'),
+A can explicitly pin a preferred version by re-registering that template ID in its own crate. Because
+A's crate elaborates last, its registration wins. `flatten_template_keys` deduplicates by key, so
+D/D' are treated as one template and A's pinned version is what gets injected and replayed. This is
+the one scenario where intentional re-registration is semantically meaningful.
+
+**Future discussion:** An unconditional assert would break version pinning. The right guard is
+either (a) an explicit `.pin("d_template", module)` API in the compose config that opts into
+intentional replacement, or (b) a `#[contract_template_override("d_template")]` attribute that
+signals the re-registration is deliberate. Either approach converts the implicit overwrite into an
+explicit, reviewable declaration. Tracked as a separate discussion — no implementation yet.
 
 ---
 
