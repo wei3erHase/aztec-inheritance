@@ -188,6 +188,28 @@ nargo check --package composition_collision_fail_contract
 
 ---
 
+## D-5: Template ID collision is a silent last-writer-wins overwrite
+
+**Behavior:** `register_template` calls `CHashMap::insert` with no existence check. If two modules
+register the same template ID string, the second registration silently overwrites the first across
+all registry maps (`TEMPLATE_MODULES`, `TEMPLATE_FUNCTIONS_QUOTED`, `TEMPLATE_ABI_EXPORTS_QUOTED`,
+`TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED`, `TEMPLATE_COMPOSED_KEYS`, …).
+
+**Elaboration order determines the winner:**
+- Same crate: `mod` declaration order — the module declared later wins.
+- Cross-crate: Noir elaborates dependencies before dependents. The root crate (typically the
+  host's crate) elaborates last and overwrites any library registration with the same ID.
+
+**Why this matters:** The dangerous scenario is a user accidentally reusing a library template ID.
+Their crate is the dependent, so it elaborates last, silently replaces the library template, and
+the host composes the wrong module with no error or warning.
+
+**Current status:** No guard exists. `register_template` does not assert on duplicate keys.
+
+**Future discussion:** Add an `assert(TEMPLATE_MODULES.get(t_key).is_none(), "duplicate template id: ...")` guard in `register_template`. This converts the silent overwrite into a loud compile-time error. Intentional re-registration (if ever needed) would require an explicit opt-in API. Not implemented yet — tracked as a separate discussion.
+
+---
+
 ## G-4: Storage field injection blocked on Noir upstream
 
 **Gap:** Host must manually declare every storage field referenced by composed function bodies.
