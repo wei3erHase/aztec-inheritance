@@ -20,7 +20,7 @@ pub contract VirtualOverrideHost {
     AztecConfig::new()
         .compose("virtual_mid_template")
         .compose("virtual_template")
-        .override_template("virtual_template", "fee_bps")
+        .override_template("virtual_template", "fee_bps"),
 )]
 pub contract TransitiveOverrideHost {
     use aztec::macros::functions::{external, view};
@@ -38,7 +38,7 @@ pub contract TransitiveOverrideHost {
         .compose("virtual_fee_override_template")
         .compose("virtual_template")
         .override_template("virtual_fee_override_template", "fee_bps")
-        .override_template("virtual_template", "fee_bps")
+        .override_template("virtual_template", "fee_bps"),
 )]
 pub contract DualOverrideTransitiveHost {
     use aztec::macros::functions::{external, view};

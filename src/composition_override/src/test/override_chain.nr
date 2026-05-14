@@ -1,5 +1,5 @@
-use aztec::test::helpers::test_environment::TestEnvironment;
 use crate::DualOverrideTransitiveHost;
+use aztec::test::helpers::test_environment::TestEnvironment;
 
 #[test]
 unconstrained fn dual_source_override_requires_directly_composed_template_ids_and_overrides_both() {
