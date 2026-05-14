@@ -42,7 +42,10 @@ impl AztecConfig {
     /// Calling `new` is equivalent to invoking the [`aztec`] macro with no parameters. The different methods
     /// (e.g. [`AztecConfig::custom_message_handler`]) can then be used to change the default behavior.
     pub comptime fn new() -> Self {
-        Self { custom_message_handler: Option::none(), composed_templates: @[] }
+        Self {
+            custom_message_handler: Option::none(),
+            composed_templates: @[],
+        }
     }
 
     /// Sets a handler for custom messages.
@@ -53,7 +56,10 @@ impl AztecConfig {
     /// `handler` must be a `#[contract_library_method]` function that conforms to the
     /// [`crate::messages::discovery::CustomMessageHandler`] type signature.
     pub comptime fn custom_message_handler(_self: Self, handler: CustomMessageHandler<()>) -> Self {
-        Self { custom_message_handler: Option::some(handler), composed_templates: _self.composed_templates }
+        Self {
+            custom_message_handler: Option::some(handler),
+            composed_templates: _self.composed_templates,
+        }
     }
 
     /// Enables injection of a named contract template into the host contract, as if the developer
@@ -101,6 +107,26 @@ pub comptime fn aztec(m: Module, args: [AztecConfig]) -> Quoted {
     } else {
         panic(f"#[aztec] expects 0 or 1 arguments, got {num_args}")
     };
+
+    let mut self_template_key = template_registry::get_template_key_by_module(m);
+    if !self_template_key.is_some() {
+        self_template_key = template_registry::get_template_key_by_module_name_hash(template_registry::module_name_key(m));
+    }
+
+    // Record template composition by module too, so transitive composition can be recovered
+    // even when template-key lookup is unavailable at this compilation phase.
+    if config.composed_templates.len() > 0 {
+        template_registry::register_template_composed_keys_for_module(m, config.composed_templates);
+    }
+
+    if self_template_key.is_some() {
+        // Record the template's own transitive dependency list so hosts flattening this template
+        // also get its composed children.
+        template_registry::register_template_composed_keys(
+            self_template_key.unwrap(),
+            config.composed_templates,
+        );
+    }
 
     // If contract templates are enabled, populate the host's composed registries with the
     // selected templates' FunctionDefinitions so that interface/stub generators include them.

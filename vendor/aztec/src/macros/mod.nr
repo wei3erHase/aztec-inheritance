@@ -64,48 +64,67 @@ pub comptime fn contract_template(m: Module, template_id: CtString) -> Quoted {
     let public_fns = external_functions_registry::get_public_functions(m);
     let utility_fns = external_functions_registry::get_utility_functions(m);
 
-    let private_internals = private_fns.map(|f| generate_private_external(f)).join(quote {});
-    let public_internals = public_fns.map(|f| generate_public_external(f)).join(quote {});
-    let utility_internals = utility_fns.map(|f| generate_utility_external(f)).join(quote {});
-
     // Pre-generate all internal function wrappers.
     let priv_internal_fns = internal_functions_registry::get_private_functions(m);
     let pub_internal_fns = internal_functions_registry::get_public_functions(m);
 
-    let priv_internal_wrappers =
-        priv_internal_fns.map(|f| generate_private_internal(f)).join(quote {});
-    let pub_internal_wrappers =
-        pub_internal_fns.map(|f| generate_public_internal(f)).join(quote {});
+    let mut all_functions = quote {};
 
-    let all_functions = quote {
-        $private_internals
-        $public_internals
-        $utility_internals
-        $priv_internal_wrappers
-        $pub_internal_wrappers
-    };
+    for f in private_fns {
+        let generated = generate_private_external(f);
+        all_functions = quote { $all_functions $generated };
+    }
+
+    for f in public_fns {
+        let generated = generate_public_external(f);
+        all_functions = quote { $all_functions $generated };
+    }
+
+    for f in utility_fns {
+        let generated = generate_utility_external(f);
+        all_functions = quote { $all_functions $generated };
+    }
+
+    for f in priv_internal_fns {
+        let generated = generate_private_internal(f);
+        all_functions = quote { $all_functions $generated };
+    }
+
+    for f in pub_internal_fns {
+        let generated = generate_public_internal(f);
+        all_functions = quote { $all_functions $generated };
+    }
 
     // Pre-generate ABI export structs.
-    let private_abi_exports = private_fns.map(|f| create_fn_abi_export(f)).join(quote {});
-    let public_abi_exports = public_fns.map(|f| create_fn_abi_export(f)).join(quote {});
-    let utility_abi_exports = utility_fns.map(|f| create_fn_abi_export(f)).join(quote {});
+    let mut all_abi_exports = quote {};
 
-    let all_abi_exports = quote {
-        $private_abi_exports
-        $public_abi_exports
-        $utility_abi_exports
-    };
+    for f in private_fns {
+        let generated = create_fn_abi_export(f);
+        all_abi_exports = quote { $all_abi_exports $generated };
+    }
 
-    let contract_library_methods = m.functions()
-        .filter(|f| is_fn_contract_library_method(f))
-        .map(|f| generate_contract_library_method_quote(f))
-        .join(quote {});
+    for f in public_fns {
+        let generated = create_fn_abi_export(f);
+        all_abi_exports = quote { $all_abi_exports $generated };
+    }
+
+    for f in utility_fns {
+        let generated = create_fn_abi_export(f);
+        all_abi_exports = quote { $all_abi_exports $generated };
+    }
+
+    let mut all_contract_library_methods = quote {};
+
+    for f in m.functions().filter(|f| is_fn_contract_library_method(f)) {
+        let generated = generate_contract_library_method_quote(f);
+        all_contract_library_methods = quote { $all_contract_library_methods $generated };
+    }
 
     template_registry::register_template(
         template_id,
         all_functions,
         all_abi_exports,
-        contract_library_methods,
+        all_contract_library_methods,
         m,
     );
     quote {}

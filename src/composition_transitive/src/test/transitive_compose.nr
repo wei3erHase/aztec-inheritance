@@ -8,20 +8,14 @@ unconstrained fn transitive_root_template_is_available() {
     assert_eq(env.view_public(host.mid_value()), 100);
 }
 
-#[test(should_fail_with = "Unknown selector")]
-unconstrained fn transitive_composition_of_templates_is_not_flattened() {
-    let (env, caller, host_address) = utils::setup();
+#[test]
+unconstrained fn transitive_composition_of_templates_is_flattened() {
+    let (env, _caller, host_address) = utils::setup();
+    let host = TransitiveComposeHost::at(host_address);
 
-    let foo_selector = comptime {
-        aztec::protocol::abis::function_selector::FunctionSelector::from_signature("foo_value()")
-    };
-    let _ = env.call_public(
-        caller,
-        aztec::context::calls::PublicCall::<9, 0, ()>::new(
-            host_address,
-            foo_selector,
-            "foo_value",
-            [],
-        ),
-    );
+    // mid_template composes both foo_template and bar_template.
+    assert_eq(env.view_public(host.foo_value()), 12);
+    assert_eq(env.view_public(host.bar_value()), 24);
+    assert_eq(env.view_public(host.foo_marker_via_internal()), 2);
+    assert_eq(env.view_public(host.bar_marker_via_internal()), 3);
 }
