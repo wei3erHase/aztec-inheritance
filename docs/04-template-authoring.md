@@ -73,10 +73,27 @@ Host replacement requires compose config:
 AztecConfig::new().compose("my_template").override_template("my_template", "fee_bps")
 ```
 
+Use the same pattern for internal helpers:
+
+```noir
+use aztec::macros::functions::{internal, template_virtual};
+
+#[template_virtual]
+#[internal("public")]
+fn _internal_helper() -> u16 {
+    30
+}
+```
+
+```noir
+AztecConfig::new().compose("my_template").override_internal_template("my_template", "_internal_helper")
+```
+
 Rules:
 
 - Non-virtual methods cannot be overridden.
 - Host override signature must match target method signature.
+- Internal overrides cannot replace `#[contract_library_method]` functions.
 - Abstract behavior is convention-driven: all externals are virtual + host overrides all.
 
 ### 2.4 Separate constants by ownership intent

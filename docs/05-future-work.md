@@ -60,6 +60,20 @@ For each candidate:
 
 **Open follow-up:** multi-layer override semantics remain a separate design decision.
 
+## PR-5: Internal helper override support
+
+**Status:** Implemented.
+
+**Core rule:** internal helper overrides use the same visibility-independent single-point replacement model.
+
+**Template side:** `#[template_virtual]` on an internal helper.
+**Host side:** `override_internal_template("template_id", "fn_name")` in `AztecConfig`.
+
+**Notes:**
+
+- The host replacement is resolved by name+signature and replayed through the same merged internal-call surface.
+- `#[contract_library_method]` helpers remain non-overridable.
+
 ---
 
 ## Upstream-gap item (currently blocked): storage field injection (G-4)

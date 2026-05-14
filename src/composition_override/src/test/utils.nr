@@ -17,3 +17,12 @@ pub unconstrained fn setup_transitive() -> (TestEnvironment, AztecAddress, Aztec
 
     (env, caller, host)
 }
+
+pub unconstrained fn setup_internal_override() -> (TestEnvironment, AztecAddress, AztecAddress) {
+    let mut env = TestEnvironment::new();
+    let caller = env.create_light_account();
+    let host =
+        env.deploy("@composition_override_contract/InternalOverrideHost").without_initializer();
+
+    (env, caller, host)
+}

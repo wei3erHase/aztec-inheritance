@@ -162,7 +162,8 @@ pub contract MultiHost { ... }
 All template ids are iterated in `inject_template_functions_to_registries`. The resulting host
 gets the union of all template surfaces. Function name collisions between templates (or between
 a template and the host) are fatal unless an override is declared via
-`override_template("template_id", "fn_name")` in `AztecConfig`.
+`override_template("template_id", "fn_name")` (external) or
+`override_internal_template("template_id", "fn_name")` (internal) in `AztecConfig`.
 
 ---
 
@@ -172,7 +173,9 @@ a template and the host) are fatal unless an override is declared via
   There is no `super` dispatch or C3 linearization; composed function sets are flattened
   into a single host surface.
 - **No `super`:** virtual/override is single-level only. A host can replace a template function
-  via `override_template("id", "fn")`, but cannot call the original template implementation from
+  via `override_template("id", "fn")` or `override_internal_template("id", "fn")`, but cannot call
+  the original template implementation from the override. There is no parent-implementation concept in
+  a flat merge.
   the override. There is no parent-implementation concept in a flat merge.
 - **Not automatic for storage:** fields must be manually declared in the host.
 - **Not a new language feature:** this is purely macro-level, working within Noir's existing
@@ -199,10 +202,10 @@ All changes are in `vendor/aztec/src/macros/`:
 
 | File | Change |
 |---|---|
-| `aztec.nr` | `AztecConfig` grew `compose("id")` + `override_template("id","fn")` support; host codegen injects composed functions before dispatch generation |
+| `aztec.nr` | `AztecConfig` grew `compose("id")` + `override_template("id","fn")`/`override_internal_template("id","fn")` support; host codegen injects composed functions before dispatch generation |
 | `mod.nr` | `#[contract_template("id")]` registration macro; captures external wrappers per-function and event structs |
 | `template_registry.nr` | Keyed registry: template module, per-function wrappers, ABI exports, library helpers, event structs, virtual flags |
-| `compose_template.nr` | `inject_template_functions_to_registries` (override-aware) + `get_composed_templates_quoted` (override-aware, events) + `compute_template_override_signatures` |
+| `compose_template.nr` | `inject_template_functions_to_registries` (override-aware) + `get_composed_templates_quoted` (override-aware, events) + `compute_template_override_signatures` + `compute_template_internal_override_signatures` |
 | `internals_functions_generation/external_functions_registry.nr` | Composed external functions merged into host registries |
 | `internals_functions_generation/internal_functions_registry.nr` | Same for composed internals |
 | `events.nr` | `register_event_selector` made idempotent for same-name/same-signature re-registration |

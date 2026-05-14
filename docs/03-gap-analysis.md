@@ -34,12 +34,12 @@ BY_DESIGN and OUT_OF_SCOPE are intentional behavior boundaries.
 If transitive behavior appears broken, first inspect template graph walk and dedup logic before changing
 any user-facing docs or tests.
 
-## G-2: No virtual/override mechanism (resolved)
+## G-2: Virtual/override mechanism (resolved)
 
 **Status:** Resolved (PR-3).
 
-**Decision:** Template external methods can be `#[template_virtual]` and replaced at host config level
-using `override_template("template_id","fn_name")`.
+**Decision:** Template methods (external and internal) can be `#[template_virtual]` and replaced at host config level
+using `override_template("template_id","fn_name")` or `override_internal_template("template_id","fn_name")`.
 
 Compose validation now:
 
@@ -47,7 +47,8 @@ Compose validation now:
 2. enforces the target function is virtual,
 3. filters overridden wrappers/ABI from injected/template quoted output.
 
-**Evidence:** `composition_override`, `composition_fixtures::virtual_template`.
+**Evidence:** `composition_override`, `composition_fixtures::virtual_template`,
+`composition_fixtures::internal_override_template`.
 
 ### Why this matters to agents
 

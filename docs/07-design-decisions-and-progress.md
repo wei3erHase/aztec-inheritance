@@ -84,6 +84,8 @@ Composed bodies execute in host scope for name resolution.
 ### 3.5 Override is single-level
 
 Override replaces a host-visible virtual function declaration from a selected template.
+Internal overrides are resolved through the same merge/replay path and also replace only one
+symbol at a time (no chain semantics).
 
 - No `super` behavior in this model.
 - "Override chain" reasoning is not valid unless a future feature is explicitly added.
@@ -141,6 +143,7 @@ If behavior is changed, check this list before merging:
 | Overrides | Override target is transitive but not directly composed | `override_transitive_missing_direct_compose` |
 | Overrides | Only one of multiple colliding virtuals is overridden | `override_transitive_partial_override` |
 | Overrides | Local template override without host config entry in same scope | `override_transitive_collision_without_override`, `override_mid_template_local_fee_bps` |
+| Overrides | Internal helper override requires `#[template_virtual]` marker on template method | `internal_override_non_virtual` |
 
 Keep this map as the "negative coverage index": any new behavior in this area must either stay documented or come with a new matching poison case.
 
@@ -197,6 +200,7 @@ Evidence anchor points you can reuse:
   - event struct replay for composed bodies
   - virtual + override wiring via `template_virtual` + `override_template`
   - abstract-template convention via all-virtual external surface
+  - internal helper override support via `template_virtual` + `override_internal_template`
 - Remaining hard boundary:
   - storage auto-injection still blocked by Noir upstream API (`TypeDefinition::add_field`)
 - Operational posture:

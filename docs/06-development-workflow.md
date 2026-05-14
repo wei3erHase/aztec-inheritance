@@ -70,6 +70,13 @@ Keep event declarations aligned: automatic replay is the current expectation.
 
 Remember single-level behavior and direct-template override target requirement.
 
+### PR-5: Internal helper override support
+
+**Status:** Implemented
+
+Internal virtual helpers should now follow the same one-step override rule using
+`override_internal_template(...)`; keep tests + poison coverage aligned before extending this behavior.
+
 ### PR-5: Storage injection blocker
 **Status:** Upstream blocked
 

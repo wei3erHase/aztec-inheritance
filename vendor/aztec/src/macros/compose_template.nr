@@ -96,6 +96,11 @@ comptime fn own_external_functions(m: Module) -> [FunctionDefinition] {
         .append(external_functions_registry::get_own_utility_functions(m))
 }
 
+comptime fn own_internal_functions(m: Module) -> [FunctionDefinition] {
+    internal_functions_registry::get_own_private_functions(m)
+        .append(internal_functions_registry::get_own_public_functions(m))
+}
+
 comptime fn has_override(
     template_key: Field,
     signature_key: Field,
@@ -197,6 +202,81 @@ pub(crate) comptime fn compute_template_override_signatures(
     resolved_overrides
 }
 
+/// Validates override declarations for template internal functions and resolves each override to
+/// `(template_key, function_signature_key)` entries.
+pub(crate) comptime fn compute_template_internal_override_signatures(
+    host: Module,
+    template_keys: [Field],
+    overrides: [(Field, Field)],
+) -> [(Field, Field)] {
+    let host_functions = own_internal_functions(host);
+    let mut host_signature_map = CHashMap::<Field, bool>::new();
+    for f in host_functions {
+        host_signature_map.insert(function_signature_key(f), true);
+    }
+
+    let mut seen_overrides = CHashMap::<(Field, Field), bool>::new();
+    let mut resolved_overrides = @[];
+
+    for override_decl in overrides {
+        let (template_key, function_name) = override_decl;
+
+        if !is_template_key_composed(template_keys, template_key) {
+            panic(
+                f"compose: cannot apply internal override for template key {template_key}; call .compose(...) before override_internal_template(...)."
+            );
+        }
+
+        let template_module_opt = template_registry::get_template_module(template_key);
+        assert(
+            template_module_opt.is_some(),
+            f"compose: no template registered for internal override target {template_key}"
+        );
+        let template_module = template_module_opt.unwrap();
+
+        let mut matched_template_function: Option<FunctionDefinition> = Option::none();
+        for template_function in own_internal_functions(template_module) {
+            if function_name == function_name_key(template_function.name()) {
+                if matched_template_function.is_some() {
+                    panic(
+                        f"compose: internal override target '{template_key}' in template {template_key} is ambiguous; overloads require unique function names in overrides"
+                    );
+                }
+                matched_template_function = Option::some(template_function);
+            }
+        }
+
+        if matched_template_function.is_none() {
+            panic(f"compose: internal override target '{template_key}' not found in template {template_key}");
+        }
+
+        let template_fn = matched_template_function.unwrap();
+        let override_signature = function_signature_key(template_fn);
+        let override_identity = (template_key, override_signature);
+
+        if seen_overrides.get(override_identity).is_some() {
+            panic(f"compose: duplicate internal override for '{template_key}' on template {template_key}");
+        }
+
+        if !template_registry::is_template_internal_function_virtual(template_key, override_signature) {
+            panic(
+                f"compose: cannot override internal '{template_key}' on template {template_key}; mark it with #[template_virtual]"
+            );
+        }
+
+        if !host_signature_map.get(override_signature).is_some() {
+            panic(
+                f"compose: internal override '{template_key}' on template {template_key} requires a host function with the same signature"
+            );
+        }
+
+        seen_overrides.insert(override_identity, true);
+        resolved_overrides = resolved_overrides.push_back(override_identity);
+    }
+
+    resolved_overrides
+}
+
 pub(crate) comptime fn function_name_key_from_ctstring(function_name: CtString) -> Field {
     function_name_key_from_template_id(function_name)
 }
@@ -206,11 +286,19 @@ pub(crate) comptime fn inject_template_functions_to_registries(
     host: Module,
     template_keys: [Field],
     override_signatures: [(Field, Field)],
+    internal_override_signatures: [(Field, Field)],
 ) {
     let mut host_signature_map = CHashMap::<Field, bool>::new();
     for f in own_external_functions(host) {
         host_signature_map.insert(function_signature_key(f), true);
     }
+
+    let mut host_internal_signature_map = CHashMap::<Field, bool>::new();
+    for f in own_internal_functions(host) {
+        host_internal_signature_map.insert(function_signature_key(f), true);
+    }
+
+    let mut composed_internal_signature_map = CHashMap::<Field, bool>::new();
 
     for template_key in flatten_template_keys(template_keys) {
         let template_module_opt = template_registry::get_template_module(template_key);
@@ -260,9 +348,39 @@ pub(crate) comptime fn inject_template_functions_to_registries(
         }
 
         for f in internal_functions_registry::get_own_private_functions(template_module) {
+            let signature_key = function_signature_key(f);
+            if has_override(template_key, signature_key, internal_override_signatures) {
+                continue;
+            }
+            if host_internal_signature_map.get(signature_key).is_some() {
+                panic(
+                    "compose: host function selector collision; mark template function as #[template_virtual] and declare .override_internal_template(...)."
+                );
+            }
+            if composed_internal_signature_map.get(signature_key).is_some() {
+                panic(
+                    "compose: host function selector collision; two internal templates expose the same selector"
+                );
+            }
+            composed_internal_signature_map.insert(signature_key, true);
             internal_functions_registry::add_composed_private(host, f);
         }
         for f in internal_functions_registry::get_own_public_functions(template_module) {
+            let signature_key = function_signature_key(f);
+            if has_override(template_key, signature_key, internal_override_signatures) {
+                continue;
+            }
+            if host_internal_signature_map.get(signature_key).is_some() {
+                panic(
+                    "compose: host function selector collision; mark template function as #[template_virtual] and declare .override_internal_template(...)."
+                );
+            }
+            if composed_internal_signature_map.get(signature_key).is_some() {
+                panic(
+                    "compose: host function selector collision; two internal templates expose the same selector"
+                );
+            }
+            composed_internal_signature_map.insert(signature_key, true);
             internal_functions_registry::add_composed_public(host, f);
         }
     }
@@ -273,6 +391,7 @@ pub(crate) comptime fn inject_template_functions_to_registries(
 pub(crate) comptime fn get_composed_templates_quoted(
     template_keys: [Field],
     override_signatures: [(Field, Field)],
+    internal_override_signatures: [(Field, Field)],
 ) -> (Quoted, Quoted, Quoted) {
     let mut all_functions = quote {};
     let mut all_abi_exports = quote {};
@@ -331,6 +450,25 @@ pub(crate) comptime fn get_composed_templates_quoted(
             all_abi_exports = quote {
                 $all_abi_exports
                 $abi
+            };
+        }
+
+        for template_function in own_internal_functions(template_module) {
+            let signature_key = function_signature_key(template_function);
+            if has_override(template_key, signature_key, internal_override_signatures) {
+                continue;
+            }
+
+            let internal_wrapper_opt = template_registry::get_template_internal_function(template_key, signature_key);
+            assert(
+                internal_wrapper_opt.is_some(),
+                f"compose: no replay payload for template internal function in {template_key}"
+            );
+            let internal_wrapper = internal_wrapper_opt.unwrap();
+
+            all_functions = quote {
+                $all_functions
+                $internal_wrapper
             };
         }
     }

@@ -126,16 +126,24 @@ pub comptime fn contract_template(m: Module, template_id: CtString) -> Quoted {
     let priv_internal_fns = internal_functions_registry::get_private_functions(m);
     let pub_internal_fns = internal_functions_registry::get_public_functions(m);
 
-    let mut all_functions = quote {};
-
     for f in priv_internal_fns {
         let generated = generate_private_internal(f);
-        all_functions = quote { $all_functions $generated };
+        template_registry::register_internal_function(
+            template_key,
+            function_signature_key(f),
+            generated,
+            f.has_named_attribute("template_virtual"),
+        );
     }
 
     for f in pub_internal_fns {
         let generated = generate_public_internal(f);
-        all_functions = quote { $all_functions $generated };
+        template_registry::register_internal_function(
+            template_key,
+            function_signature_key(f),
+            generated,
+            f.has_named_attribute("template_virtual"),
+        );
     }
 
     // Pre-generate ABI export structs.
@@ -167,7 +175,7 @@ pub comptime fn contract_template(m: Module, template_id: CtString) -> Quoted {
 
     template_registry::register_template(
         template_id,
-        all_functions,
+        quote {},
         all_abi_exports,
         all_contract_library_methods,
         template_events,

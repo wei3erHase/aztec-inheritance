@@ -30,6 +30,8 @@ comptime mut global TEMPLATE_KEY_BY_MODULE: CHashMap<Module, Field> = CHashMap::
 comptime mut global TEMPLATE_EXTERNAL_FN_WRAPPERS: CHashMap<(Field, Field), Quoted> = CHashMap::new();
 comptime mut global TEMPLATE_EXTERNAL_FN_ABI_EXPORTS: CHashMap<(Field, Field), Quoted> = CHashMap::new();
 comptime mut global TEMPLATE_VIRTUAL_EXTERNAL_FN_KEYS: CHashMap<(Field, Field), bool> = CHashMap::new();
+comptime mut global TEMPLATE_INTERNAL_FN_QUOTED: CHashMap<(Field, Field), Quoted> = CHashMap::new();
+comptime mut global TEMPLATE_VIRTUAL_INTERNAL_FN_KEYS: CHashMap<(Field, Field), bool> = CHashMap::new();
 
 pub(crate) comptime fn template_key(template_id: CtString) -> Field {
     let template_id_str = template_id.as_quoted_str!();
@@ -77,6 +79,19 @@ pub(crate) comptime fn register_external_function(
     TEMPLATE_EXTERNAL_FN_ABI_EXPORTS.insert(registry_key, abi_export);
     if is_virtual {
         TEMPLATE_VIRTUAL_EXTERNAL_FN_KEYS.insert(registry_key, true);
+    }
+}
+
+pub(crate) comptime fn register_internal_function(
+    template_key: Field,
+    function_key: Field,
+    wrapper: Quoted,
+    is_virtual: bool,
+) {
+    let registry_key = (template_key, function_key);
+    TEMPLATE_INTERNAL_FN_QUOTED.insert(registry_key, wrapper);
+    if is_virtual {
+        TEMPLATE_VIRTUAL_INTERNAL_FN_KEYS.insert(registry_key, true);
     }
 }
 
@@ -151,6 +166,14 @@ pub(crate) comptime fn get_template_external_function_abi_export(
     TEMPLATE_EXTERNAL_FN_ABI_EXPORTS.get((template_key, function_key))
 }
 
+pub(crate) comptime fn get_template_internal_function(template_key: Field, function_key: Field) -> Option<Quoted> {
+    TEMPLATE_INTERNAL_FN_QUOTED.get((template_key, function_key))
+}
+
 pub(crate) comptime fn is_template_external_function_virtual(template_key: Field, function_key: Field) -> bool {
     TEMPLATE_VIRTUAL_EXTERNAL_FN_KEYS.get((template_key, function_key)).is_some()
+}
+
+pub(crate) comptime fn is_template_internal_function_virtual(template_key: Field, function_key: Field) -> bool {
+    TEMPLATE_VIRTUAL_INTERNAL_FN_KEYS.get((template_key, function_key)).is_some()
 }
