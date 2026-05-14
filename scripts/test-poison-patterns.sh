@@ -12,9 +12,10 @@
 # must be temporarily added to the root Nargo.toml workspace members before
 # nargo can find it. This script patches and restores atomically.
 #
-# Usage: ./scripts/test-poison-patterns.sh [pattern_name]
+# Usage: ./scripts/test-poison-patterns.sh [pattern]
 #   No args: test all patterns in src/poison/
-#   pattern_name: test only src/poison/<pattern_name>/
+#   pattern: case-sensitive substring filter on pattern directory names, e.g.
+#            "override" -> tests all patterns containing that substring
 
 set -euo pipefail
 
