@@ -1,0 +1,18 @@
+[package]
+name = "event_host_redeclares"
+type = "contract"
+authors = ["Wonderland"]
+compiler_version = ">=1.0.0"
+
+# Poison package: EXPECTED to fail compilation.
+#
+# `foo_storage_template` declares `FooEvt` and auto-replays it into composed hosts.
+# This host manually re-declares `FooEvt` with the same shape -- a pattern that was
+# required before PR-2 (event auto-replay) but is now a duplicate struct definition.
+#
+# Constraint introduced by PR-2: hosts must NOT manually redeclare event structs
+# that are auto-replayed from composed templates.
+
+[dependencies]
+aztec = { path = "../../../vendor/aztec" }
+composition_fixtures = { path = "../../composition_fixtures" }
