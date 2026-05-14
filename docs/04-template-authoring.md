@@ -172,10 +172,10 @@ fn constructor(name: str<31>, ...) {
 
 ## Host author rules
 
-### 1. List all templates explicitly
+### 1. Compose template entry points (transitive closure is automatic)
 
-Compose chains are now flattened recursively. If `mid_template` composes `foo_template` internally,
-composing `mid_template` includes `foo_template` and its transitive dependencies automatically:
+Compose chains are flattened recursively. If `mid_template` composes `foo_template` internally,
+composing `mid_template` also includes `foo_template` and its transitive dependencies automatically:
 
 ```noir
 #[aztec(AztecConfig::new().compose("foo_template").compose("bar_template"))]
@@ -236,6 +236,6 @@ Add a header comment listing your composed templates and what they provide:
 - [ ] Host declares all required storage fields from every composed template
 - [ ] Validate that required events are replayed from composed templates (no manual redeclare needed)
 - [ ] Host constructor calls `_initialize_<template>()` for every composed template that requires init
-- [ ] All top-level composed template ids are explicitly listed (transitive dependencies are auto-flattened)
+- [ ] All directly composed template ids are intentionally chosen (transitive dependencies are auto-included)
 - [ ] A positive surface test exists (composed externals callable)
 - [ ] A negative collision test or naming convention prevents accidental name overlap

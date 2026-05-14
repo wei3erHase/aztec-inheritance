@@ -137,8 +137,9 @@ a template and the host) are fatal -- there is no override mechanism today.
 
 ## What composition is NOT
 
-- **Not hierarchical:** composing `mid_template` (which itself composes `foo_template`) does NOT
-  include `foo_template` functions in the host. Transitive composition is not flattened.
+- **No inheritance hierarchy:** this is merge-and-replay, not Solidity-style inheritance.
+  There is no `super` dispatch or method override chain; composed function sets are flattened
+  into a single host surface.
 - **Not virtual/override:** same-name collision = fatal compile error.
 - **Not automatic for storage:** fields must be manually declared in the host.
 - **Not a new language feature:** this is purely macro-level, working within Noir's existing

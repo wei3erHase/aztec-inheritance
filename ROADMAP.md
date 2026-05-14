@@ -25,7 +25,7 @@
 - `TokenContractTemplate` (AIP-20 surface) as first real consumer
 - `Amm` host contract: AMM pool + full token at one address, 4 developer-written functions, 24 token functions generated
 - Test scaffold: `composition_fixtures`, `composition_multi`, `composition_transitive`, `composition_host`, `composition_collision_fail` (poison)
-- 18 Solidity inheritance hypotheses validated (9 IMPLEMENTED, 2 PLANNED_CHANGE, 3 KNOWN_GAP, 2 BY_DESIGN, 3 OUT_OF_SCOPE)
+- 18 Solidity inheritance hypotheses validated (10 IMPLEMENTED, 2 PLANNED_CHANGE, 2 KNOWN_GAP, 2 BY_DESIGN, 3 OUT_OF_SCOPE)
 
 **What compiles and runs:**
 
@@ -55,10 +55,14 @@ Test package: `src/composition_override/`
 
 | ID | Limitation | Status |
 |----|-----------|--------|
-| G-1 | Transitive composition not flattened; grandchild functions silently absent | PR-1: investigate recursive injection; warning as fallback |
 | G-2 | No virtual/override mechanism; collision is fatal | PR-3/PR-4: M4 planned |
 | G-3 | Event structs must be re-declared in host | Not planned; inconvenient but not critical |
 | G-4 | Host must manually declare all template storage fields | Blocked on Noir `TypeDefinition::add_field`; design sketch in docs/05-future-work.md |
+
+### 2026-05-13 -- PR-1 transitive composition shipped
+
+Transitive composition is now implemented by recursive flattening at compose expansion (`mid_template` includes its
+own transitive dependencies). This closes G-1 in `docs/03-gap-analysis.md`.
 
 ---
 

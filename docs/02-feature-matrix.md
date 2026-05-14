@@ -47,8 +47,8 @@ proof (pass/fail). Zero hypotheses unresolved.
 
 ### #8 -- transitive composition is now flattened
 
-Composing `mid_template` now recursively injects transitive template functions, so `foo_value()` and `bar_value()`
-are callable from the host without additional `compose(...)` entries.
+Composing a template now recursively injects transitive dependencies, so grandchild template functions are
+made available automatically.
 
 ### #12 -- globals are host-scope bindings, not template-owned statics
 

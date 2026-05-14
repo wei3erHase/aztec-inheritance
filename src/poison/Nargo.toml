@@ -1,7 +1,9 @@
 [workspace]
 members = [
+  "host_global_scope_resolved_limit",
   "missing_storage_var",
   "collision_no_override",
+  "storage_shape_mismatch",
 ]
 
 # Poison workspace: packages expected to FAIL compilation.

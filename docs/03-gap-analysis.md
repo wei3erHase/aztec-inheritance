@@ -15,28 +15,27 @@ explained inline in the matrix.
 **Status:** Implemented (PR-1).
 
 **Implementation:** Composing a template now recursively injects all transitive template functions.
-Only direct template collisions are skipped only by normal existing collision rules.
+Function-name collisions still follow existing compose collision rules.
 
-**Root cause (historical):** `inject_template_functions_to_registries` previously iterated only the
-requested template keys and injected only their own `FunctionDefinition`s, with no recursion.
+**Root cause (historical):** `inject_template_functions_to_registries` previously only injected
+the directly composed templates and ignored their dependencies.
 
 **Evidence:** `composition_transitive` -- `mid_value()`, `foo_value()`, and `bar_value()` are all
 callable from the host.
 
-**Decision:** PR-1 implemented recursive expansion and removed this gap. Remaining behavior remains
-that function-name collisions still produce hard compile errors.
+**Decision:** PR-1 implemented recursive expansion and removed this gap.
 
 **Solidity equivalent:** `C is B, A` flattens the full hierarchy. Gap on flattening is accepted;
 the warning closes the UX gap.
 
 ---
 
-## G-2: No virtual/override mechanism (planned)
+## G-2: No virtual/override mechanism (blocked)
 
 **Gap:** Two composed templates with the same function name cause a compile error. The host cannot
-override a composed template function. This is a PLANNED_CHANGE -- the collision diagnostic is
-correct and good; the missing feature is allowing the host to intentionally replace a template
-function.
+override a composed template function. This is currently blocked by registry shape: template wrappers
+and ABI exports are stored as per-template aggregates, so selective override filtering is not
+implemented without a deeper refactor.
 
 **Root cause:** The compose machinery generates one `__aztec_nr_internals__<fn_name>` wrapper per
 function. `generate_public_dispatch` rejects duplicate selectors. There is no mechanism to mark a
@@ -183,6 +182,39 @@ in `Nargo.toml`. They exist in `src/` as documentation and manual test evidence.
 nargo check --package composition_collision_fail_contract
 # Expected: "Public function selector collision detected"
 ```
+
+---
+
+## D-5: Template ID collision is a silent last-writer-wins overwrite
+
+**Behavior:** `register_template` calls `CHashMap::insert` with no existence check. If two modules
+register the same template ID string, the second registration silently overwrites the first across
+all registry maps (`TEMPLATE_MODULES`, `TEMPLATE_FUNCTIONS_QUOTED`, `TEMPLATE_ABI_EXPORTS_QUOTED`,
+`TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED`, `TEMPLATE_COMPOSED_KEYS`, …).
+
+**Elaboration order determines the winner:**
+- Same crate: `mod` declaration order — the module declared later wins.
+- Cross-crate: Noir elaborates dependencies before dependents. The root crate (typically the
+  host's crate) elaborates last and overwrites any library registration with the same ID.
+
+**Why this matters:** The dangerous scenario is a user accidentally reusing a library template ID.
+Their crate is the dependent, so it elaborates last, silently replaces the library template, and
+the host composes the wrong module with no error or warning.
+
+**Current status:** No guard exists. `register_template` does not assert on duplicate keys.
+
+**Legitimate use case — version pinning:** If A composes B and C, and both transitively pull in
+different implementations of the same interface registered under the same ID (call them D and D'),
+A can explicitly pin a preferred version by re-registering that template ID in its own crate. Because
+A's crate elaborates last, its registration wins. `flatten_template_keys` deduplicates by key, so
+D/D' are treated as one template and A's pinned version is what gets injected and replayed. This is
+the one scenario where intentional re-registration is semantically meaningful.
+
+**Future discussion:** An unconditional assert would break version pinning. The right guard is
+either (a) an explicit `.pin("d_template", module)` API in the compose config that opts into
+intentional replacement, or (b) a `#[contract_template_override("d_template")]` attribute that
+signals the re-registration is deliberate. Either approach converts the implicit overwrite into an
+explicit, reviewable declaration. Tracked as a separate discussion — no implementation yet.
 
 ---
 

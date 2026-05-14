@@ -9,11 +9,12 @@ or milestone it closes.
 
 ---
 
-## PR-1: Transitive composition -- inject or warn (Closes G-1)
+## PR-1: Transitive composition -- flatten transitive dependencies (Closes G-1)
 
-**Goal:** When a host composes `mid_template` and `mid_template` itself composed `foo_template`,
-the host silently does not get `foo_value()`. Fix this, preferably by injecting transitively;
-fall back to a compile warning if injection proves problematic.
+**Status:** Implemented.
+
+**Goal:** Ensure transitive template composition is flattened (recursive dependency injection), so hosts
+get grandchild template functions without re-listing the full template graph.
 
 ### Option A: Transitive injection (preferred)
 
@@ -35,27 +36,9 @@ function name collides with a host function, it is an error (same as today for d
 
 **Effort:** Medium -- new registry key + recursive loop with dedup guard.
 
-### Option B: Compile warning (fallback)
-
-If transitive injection produces unexpected complexity (e.g., ambiguous collision semantics when
-a function appears in multiple transitive paths), emit a compile warning instead:
-
-In `compose_template.nr`, after resolving each template module, check whether that module has
-any entries in `TEMPLATE_COMPOSED_IDS`. If so, emit a `println!` or `std::compile_error` warning
-listing the grandchild ids that are NOT flattened.
-
-**Effort:** Small -- one check + message.
-
 ### Decision for PR-1
 
-Start with Option A. If the recursive deduplication logic is clean, ship injection. If the
-collision semantics for multi-path grandchildren are unclear, fall back to Option B (warning)
-and leave injection for a follow-up once the semantics are agreed.
-
-**Doc updates when done:**
-- `02-feature-matrix.md`: entry #8 status changes from `KNOWN_GAP` to `IMPLEMENTED`
-- `03-gap-analysis.md`: G-1 decision updated
-- `04-template-authoring.md`: update "list all templates explicitly" rule to reflect new behavior
+Implemented via recursive transitive flattening with deduplication.
 
 ---
 
@@ -78,6 +61,10 @@ structs in the host module.
 ---
 
 ## PR-3/PR-4: Virtual/override mechanism + abstract templates (Closes G-2, matrix #10 and #16)
+
+**Status:** Blocked. Current compose registry stores template wrappers as monolithic quoted blobs, so
+overridden-function filtering requires a deeper per-function registry refactor before this can be safely
+implemented without changing emitted ABI semantics.
 
 **Goal:** Allow a host to override specific template functions without triggering a collision.
 A template where ALL functions are virtual is effectively an abstract template (#16 -- implementable
