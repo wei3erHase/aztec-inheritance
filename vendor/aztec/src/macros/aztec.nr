@@ -8,6 +8,7 @@ use crate::{
         },
         compose_template::{
             compute_template_override_signatures,
+            compute_template_internal_override_signatures,
             function_name_key_from_ctstring,
             get_composed_templates_quoted,
             inject_template_functions_to_registries,
@@ -40,6 +41,7 @@ pub struct AztecConfig {
     custom_message_handler: Option<CustomMessageHandler<()>>,
     composed_templates: [Field],
     template_overrides: [(Field, Field)],
+    internal_template_overrides: [(Field, Field)],
 }
 
 impl AztecConfig {
@@ -48,7 +50,12 @@ impl AztecConfig {
     /// Calling `new` is equivalent to invoking the [`aztec`] macro with no parameters. The different methods
     /// (e.g. [`AztecConfig::custom_message_handler`]) can then be used to change the default behavior.
     pub comptime fn new() -> Self {
-        Self { custom_message_handler: Option::none(), composed_templates: @[], template_overrides: @[] }
+        Self {
+            custom_message_handler: Option::none(),
+            composed_templates: @[],
+            template_overrides: @[],
+            internal_template_overrides: @[],
+        }
     }
 
     /// Sets a handler for custom messages.
@@ -63,6 +70,7 @@ impl AztecConfig {
             custom_message_handler: Option::some(handler),
             composed_templates: _self.composed_templates,
             template_overrides: _self.template_overrides,
+            internal_template_overrides: _self.internal_template_overrides,
         }
     }
 
@@ -74,6 +82,7 @@ impl AztecConfig {
     pub comptime fn compose(_self: Self, template_id: CtString) -> Self {
         Self {
             custom_message_handler: _self.custom_message_handler,
+            internal_template_overrides: _self.internal_template_overrides,
             template_overrides: _self.template_overrides,
             composed_templates: _self.composed_templates.push_back(
                 template_registry::template_key(template_id),
@@ -89,8 +98,31 @@ impl AztecConfig {
         Self {
             custom_message_handler: _self.custom_message_handler,
             composed_templates: _self.composed_templates,
+            internal_template_overrides: _self.internal_template_overrides,
             template_overrides: _self
                 .template_overrides
+                .push_back((
+                    template_registry::template_key(template_id),
+                    function_name_key_from_ctstring(function_name),
+                )),
+        }
+    }
+
+    /// Allows a host to replace a composed template internal function implementation.
+    ///
+    /// The target function must be marked with `#[template_virtual]` and the host must define a function
+    /// with the same signature and name in the contract module.
+    pub comptime fn override_internal_template(
+        _self: Self,
+        template_id: CtString,
+        function_name: CtString,
+    ) -> Self {
+        Self {
+            custom_message_handler: _self.custom_message_handler,
+            template_overrides: _self.template_overrides,
+            composed_templates: _self.composed_templates,
+            internal_template_overrides: _self
+                .internal_template_overrides
                 .push_back((
                     template_registry::template_key(template_id),
                     function_name_key_from_ctstring(function_name),
@@ -150,25 +182,36 @@ pub comptime fn aztec(m: Module, args: [AztecConfig]) -> Quoted {
         );
     }
 
-    let template_override_signatures: Option<[(Field, Field)]> = if config.template_overrides.len() > 0 {
-        Option::some(compute_template_override_signatures(
+    let template_override_signatures: [(Field, Field)] = if config.template_overrides.len() > 0 {
+        compute_template_override_signatures(
             m,
             config.composed_templates,
             config.template_overrides,
-        ))
-    } else if config.composed_templates.len() > 0 {
-        Option::some(@[])
+        )
     } else {
-        Option::none()
+        @[]
+    };
+
+    let template_internal_override_signatures: [(Field, Field)] = if
+        config.internal_template_overrides.len() > 0
+    {
+        compute_template_internal_override_signatures(
+            m,
+            config.composed_templates,
+            config.internal_template_overrides,
+        )
+    } else {
+        @[]
     };
 
     // If contract templates are enabled, populate the host's composed registries with the
     // selected templates' FunctionDefinitions so that interface/stub generators include them.
-    if template_override_signatures.is_some() {
+    if config.composed_templates.len() > 0 {
         inject_template_functions_to_registries(
             m,
             config.composed_templates,
-            template_override_signatures.unwrap(),
+            template_override_signatures,
+            template_internal_override_signatures,
         );
     }
 
@@ -228,14 +271,15 @@ pub comptime fn aztec(m: Module, args: [AztecConfig]) -> Quoted {
     let public_dispatch = generate_public_dispatch(m, has_public_init_nullifier_fn);
 
     let (composed_functions, composed_abi_exports, composed_events) =
-        if template_override_signatures.is_some() {
+        if config.composed_templates.len() > 0 {
             get_composed_templates_quoted(
                 config.composed_templates,
-                template_override_signatures.unwrap(),
+                template_override_signatures,
+                template_internal_override_signatures,
             )
-    } else {
-        (quote {}, quote {}, quote {})
-    };
+        } else {
+            (quote {}, quote {}, quote {})
+        };
 
     quote {
         $interface

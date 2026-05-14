@@ -6,5 +6,9 @@ members = [
   "src/composition_multi",
   "src/composition_transitive",
   "src/composition_host",
+  "src/composition_override_dual",
+  "src/composition_override_internal",
   "src/composition_override",
+  "src/composition_override_transitive",
+  "src/composition_diamond_transitive",
 ]

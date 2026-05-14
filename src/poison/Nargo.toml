@@ -1,11 +1,18 @@
 [workspace]
 members = [
   "host_global_scope_resolved_limit",
+  "internal_override_non_virtual",
   "missing_storage_var",
   "collision_no_override",
   "storage_shape_mismatch",
   "event_host_redeclares",
   "event_collision_across_templates",
+  "override_mid_template_local_fee_bps",
+  "override_transitive_missing_direct_compose",
+  "override_transitive_collision_without_override",
+  "override_transitive_partial_override",
+  "transitive_diamond_leaf_collision",
+  "transitive_diamond_leaf_collision_reverse",
 ]
 
 # Poison workspace: packages expected to FAIL compilation.

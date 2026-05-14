@@ -1,0 +1,17 @@
+[package]
+name = "transitive_diamond_leaf_collision_reverse"
+type = "contract"
+authors = ["Wonderland"]
+compiler_version = ">=1.0.0"
+
+# Poison package: EXPECTED to fail compilation.
+#
+# The two composed branches expose `leaf_value()` from different template ids:
+# - transitive_diamond_left_template -> transitive_diamond_leaf
+# - transitive_diamond_right_conflict_template -> transitive_diamond_conflict_leaf
+#
+# This is the mirrored variant of transitive leaf collision handling.
+
+[dependencies]
+aztec = { path = "../../../vendor/aztec" }
+composition_fixtures = { path = "../../composition_fixtures" }

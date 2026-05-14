@@ -4,220 +4,185 @@
 > **Audience:** Developers, Aztec/Noir contributors, reviewers  
 > **Last updated:** 2026-05-13
 
-Root causes, evidence, and decisions for KNOWN_GAP and PLANNED_CHANGE entries from
-[docs/02-feature-matrix.md](02-feature-matrix.md). BY_DESIGN and OUT_OF_SCOPE entries are
-explained inline in the matrix.
+## 1) Agent decision loop
 
----
+Use this loop when a behavior request appears to fail:
+
+1. Map the request to a matrix entry in [docs/02-feature-matrix.md](02-feature-matrix.md).
+2. Confirm whether the behavior is implemented, a deliberate design choice, or blocked.
+3. If no row exists, add a hypothesis as a temporary note and capture a failing fixture before implementation.
+4. Update this file only when behavior changes would affect compile/runtime guarantees.
+
+Root causes and decisions for KNOWN_GAP and PLANNED_CHANGE entries from the matrix.
+BY_DESIGN and OUT_OF_SCOPE are intentional behavior boundaries.
 
 ## G-1: Transitive composition is flattened
 
 **Status:** Implemented (PR-1).
 
-**Implementation:** Composing a template now recursively injects all transitive template functions.
-Function-name collisions still follow existing compose collision rules.
+**Decision:** Recursive template closure during compose is required behavior.
 
-**Root cause (historical):** `inject_template_functions_to_registries` previously only injected
-the directly composed templates and ignored their dependencies.
+**Implementation:** composing a template now injects both direct and transitive template functions.
+`inject_template_functions_to_registries` now walks transitive closure and deduplicates.
 
-**Evidence:** `composition_transitive` -- `mid_value()`, `foo_value()`, and `bar_value()` are all
-callable from the host.
+**Root cause (historical):** inject path initially ignored composed IDs from template metadata.
 
-**Decision:** PR-1 implemented recursive expansion and removed this gap.
+**Evidence:** `composition_transitive` (`mid_value()`, `foo_value()`, `bar_value()`).
 
-**Solidity equivalent:** `C is B, A` flattens the full hierarchy. Gap on flattening is accepted;
-the warning closes the UX gap.
+### Why this matters to agents
 
----
+If transitive behavior appears broken, first inspect template graph walk and dedup logic before changing
+any user-facing docs or tests.
 
-## G-2: No virtual/override mechanism (resolved)
+## G-2: Virtual/override mechanism (resolved)
 
-**Gap:** resolved by PR-3. Template external functions can be marked `#[template_virtual]`, and hosts
-can replace them via `override_template("template_id", "fn_name")` in `AztecConfig`.
+**Status:** Resolved (PR-3).
 
-**Resolution:** Template external functions can be marked `#[template_virtual]`, and hosts can replace
-them by declaring `override_template("template_id", "fn_name")` in `AztecConfig`.
+**Decision:** Template methods (external and internal) can be `#[template_virtual]` and replaced at host config level
+using `override_template("template_id","fn_name")` or `override_internal_template("template_id","fn_name")`.
 
-compose machinery now:
+Compose validation now:
 
-1. validates override declarations (template exists, target exists, signature exists, not duplicated);
-2. requires the target template function to be virtual;
-3. skips overridden template functions during both composed function registry injection and template quoted replay;
-4. preserves non-overridden template functions and ABI entries in host composition output.
+1. checks override targets exist and are not duplicated,
+2. enforces the target function is virtual,
+3. filters overridden wrappers/ABI from injected/template quoted output.
 
-**Evidence:** `composition_override` + `composition_fixtures::virtual_template`
+**Evidence:** `composition_override`, `composition_fixtures::virtual_template`,
+`composition_fixtures::internal_override_template`.
 
-**Solidity equivalent:** `virtual`/`override` (single-level merge-and-replay). There is still no C3 linearization or `super`.
+### Why this matters to agents
 
----
+Only a directly composed template can receive host override in current model.
+If an override cannot compile, inspect compose ID + virtual registration metadata first.
 
-## G-3: Event structs used by composed bodies are auto-replayed (implemented)
+## G-3: Event structs used by composed bodies are auto-replayed
 
-**Gap status:** Implemented.
+**Status:** Implemented.
 
-**Gap:** Host-side `#[event]` type declaration was previously required for event structs defined in templates
-that were referenced from composed function bodies.
+**Decision:** Event structs are now explicitly replayed into host output for composed templates.
 
-**Root cause:** Composed function bodies carry raw token streams. The body `{ self.emit(FooEvt {...}) }`
-resolves `FooEvt` in the host module's scope at injection time.
+**Implementation:**
 
-This is now closed by replaying template event declarations during composition:
+- Template event structs are collected at `#[contract_template]` time.
+- `get_composed_templates_quoted` replays those declarations into host generation.
+- Event selector registration is idempotent.
 
-1. `#[contract_template]` stores declarations for all template structs marked `#[event]` in
-   `template_registry.nr`.
-2. `get_composed_templates_quoted` replays these declarations into the host output.
-3. Existing event selector registration remains idempotent to tolerate harmless duplicate registration.
-
-**Evidence:** `composition_host/src/main.nr` now composes `FooStorageTemplate` without a manually declared
-`FooEvt` and still compiles/runs via composed `foo_increment`.
-
-**Decision:** Implemented in PR-2.
-
-**Solidity equivalent:** Base contract events are directly usable in derived contracts.
-
----
+**Evidence:** `composition_host` composes template event emission without manual host `FooEvt` declaration.
 
 ## D-1: Compose is merge-and-replay, not hierarchical dispatch
 
-**Decision:** The current implementation is intentionally a "merge-and-replay" model. Functions
-from selected templates are concatenated into the host. There is no dispatch hierarchy, no C3
-linearization, no implicit ordering.
+**Status:** Architected decision.
 
-**Implications:**
-- Multi-compose is flat: all templates at the same level with equal precedence
-- Transitive flattening (G-1); all composed templates are recursively included by `compose()`
-- No override chain today (G-2); single-level replacement implemented in PR-3
-- `super` does not apply: there is no "parent implementation" in a flat merge
-- All composed function names must be unique across the host and all composed templates
+**Decision:** Composition is a flat merge of registries, not parent-child dispatch.
 
-**Why this is the right tradeoff:** Implementing full Solidity-style inheritance in Noir's comptime
-system requires language-level support (storage field injection, override attributes, super dispatch).
-The merge-and-replay model is sufficient for the "AIP-20 token as a mixin" use case and can be
-extended incrementally as language support improves.
+- No inheritance hierarchy.
+- No C3 linearization.
+- No `super`.
+- Overrides are local to host and operate as replacement entries.
 
----
+**Evidence / impact:** `docs/02-feature-matrix.md` entries 11, 17, 18.
+
+### Why this matters to agents
+
+Do not introduce chain semantics in reviews unless a feature explicitly adds a dispatch hierarchy.
 
 ## D-2: Host owns storage (by design)
 
-**Decision:** The host is the single owner of all storage. Templates have no private storage and
-should not reference storage slots by position/id. The host declares storage fields in whatever
-order it chooses; slot numbers are assigned by the host's Storage struct declaration order.
+**Status:** By design.
 
-This is not a gap -- it is an intentional architectural boundary:
+**Decision:** Templates do not own injected slot-level storage declarations. The host owns storage
+and composes by field name references in template code.
 
-- Templates are function sets, not state machines with private state
-- Storage field declarations are a contract published by the template (see
-  [docs/04-template-authoring.md](04-template-authoring.md)) that the host must satisfy
-- The host can arrange fields in any order; composed function bodies reference fields by NAME
-  (via `self.storage.foo_counter`) not by slot number, so order is irrelevant for correctness
+**Operational rule:**
 
-**What this means for template authors:** document the storage field names and types your composed
-functions reference. The host will declare them. Do not rely on slot numbers or ordering.
+- Templates document required field names and types.
+- Hosts declare matching fields.
+- Slot ordering is host-defined by its `Storage` declaration order.
 
-**Future possibility:** slot ordering enforcement could be added (e.g., template fields must occupy
-lower slots for upgrade safety), but there is no current requirement for this.
+**Evidence / impact:** matrix entries 4, 5, 14, 15.
 
----
+### Why this matters to agents
 
-## D-3: Global names in composed bodies are host-scope bindings (by design)
+A host compile error on `self.storage.<field>` is typically a missing declaration error, not a
+mechanism regression.
 
-**Decision:** Any global name referenced in a composed function body resolves in the HOST module's
-scope at injection time. This is intentional and useful: the host controls what the binding contains.
+## D-3: Global names in composed bodies resolve in host scope
 
-**What the template cannot do:** self-reference its own module globals in composable bodies. The
-body is elaborated by `#[aztec]` during template processing inside the contract block context, where
-module-scope globals are not accessible. Without Noir `crate::` self-reference in comptime contexts,
-the template cannot write a stable path to its own globals. This is a Noir comptime limitation, not
-an Aztec composition limitation.
+**Status:** By design.
 
-**Pattern for template-owned constants:** use `#[contract_library_method]`:
+**Decision:** Name resolution in composed quoted bodies happens in host module scope.
 
-```noir
-// Template -- constant belongs to the template implementation
-#[contract_library_method]
-fn _initial_notes() -> u32 { 2 }
+**Pattern:**
 
-// In composable body: reference the helper, not a raw global
-#[external("public")]
-fn do_thing() {
-    let n = _initial_notes();  // migrates via f.as_typed_expr(), always resolves
-}
-```
+- Template-owned constants/helpers: use `#[contract_library_method]` (typed expr migration).
+- Host-configurable values: require host-provided symbol/binding/import.
 
-**Pattern for host-parameterizable names:** reference the name unqualified in the body; document it
-as a "host-must-provide binding":
+**Evidence / impact:** matrix entries 12 and 13.
 
-```noir
-// Template -- body references FOO_CONFIG, which the host must supply
-#[external("public")]
-fn use_config() -> u32 {
-    FOO_CONFIG  // host provides this name
-}
+### Why this matters to agents
 
-// Host -- provides the binding (import or local declaration)
-use composition_fixtures::foo_template::FOO_CONFIG;  // import from template crate
-// OR:
-pub global FOO_CONFIG: u32 = 99;  // host overrides with its own value
-```
-
----
+Do not fix this by adding hidden global-copy features in compose; this is an intentional contract boundary.
 
 ## D-4: Poison packages are excluded from workspace
 
-**Decision:** Packages expected to fail compilation (`composition_collision_fail`) are NOT included
-in `Nargo.toml`. They exist in `src/` as documentation and manual test evidence.
+**Status:** Working decision.
 
-**To run a poison test manually:**
-```bash
-# Temporarily add to Nargo.toml, then:
-nargo check --package composition_collision_fail_contract
-# Expected: "Public function selector collision detected"
-```
+**Decision:** Expected-fail composition fixtures live as evidence artifacts, not always in CI workspace.
 
----
+**How to execute:** keep failing cases in dedicated packages (for example,
+`composition_collision_fail`) and run manually when needed.
 
-## D-5: Template ID collision is a silent last-writer-wins overwrite
+**Manual runbook:**
 
-**Behavior:** `register_template` calls `CHashMap::insert` with no existence check. If two modules
-register the same template ID string, the second registration silently overwrites the first across
-all registry maps (`TEMPLATE_MODULES`, `TEMPLATE_FUNCTIONS_QUOTED`, `TEMPLATE_ABI_EXPORTS_QUOTED`,
-`TEMPLATE_CONTRACT_LIBRARY_METHODS_QUOTED`, `TEMPLATE_COMPOSED_KEYS`, …).
+1. Temporarily add the package to `Nargo.toml`.
+2. Run `nargo check --package composition_collision_fail_contract`.
+3. Expect selector collision failure.
 
-**Elaboration order determines the winner:**
-- Same crate: `mod` declaration order — the module declared later wins.
-- Cross-crate: Noir elaborates dependencies before dependents. The root crate (typically the
-  host's crate) elaborates last and overwrites any library registration with the same ID.
+### Why this matters to agents
 
-**Why this matters:** The dangerous scenario is a user accidentally reusing a library template ID.
-Their crate is the dependent, so it elaborates last, silently replaces the library template, and
-the host composes the wrong module with no error or warning.
+Keep CI green while still preserving a reproducible proof for forbidden paths.
 
-**Current status:** No guard exists. `register_template` does not assert on duplicate keys.
+## D-5: Template ID collisions are last-writer-wins today
 
-**Legitimate use case — version pinning:** If A composes B and C, and both transitively pull in
-different implementations of the same interface registered under the same ID (call them D and D'),
-A can explicitly pin a preferred version by re-registering that template ID in its own crate. Because
-A's crate elaborates last, its registration wins. `flatten_template_keys` deduplicates by key, so
-D/D' are treated as one template and A's pinned version is what gets injected and replayed. This is
-the one scenario where intentional re-registration is semantically meaningful.
+**Status:** Observed behavior.
 
-**Future discussion:** An unconditional assert would break version pinning. The right guard is
-either (a) an explicit `.pin("d_template", module)` API in the compose config that opts into
-intentional replacement, or (b) a `#[contract_template_override("d_template")]` attribute that
-signals the re-registration is deliberate. Either approach converts the implicit overwrite into an
-explicit, reviewable declaration. Tracked as a separate discussion — no implementation yet.
+**Decision:** `register_template` inserts by key without duplicate guard, so later registrations win.
 
----
+**Risk:** accidental overwrite across crates can silently change the composed template implementation.
 
-## G-4: Storage field injection blocked on Noir upstream
+**Current handling:** no hard assert; intentional re-registration can be used as a version-pin mechanism.
 
-**Gap:** Host must manually declare every storage field referenced by composed function bodies.
-Templates cannot inject fields automatically.
+**Evidence / discussion:** unresolved but tracked; matrix remains unchanged because this is cross-cutting
+and explicit design tradeoff.
 
-**Blocker:** `TypeDefinition::add_field` does not exist in the Noir comptime API. This is a
-language-level change that must be contributed upstream.
+### Safe handling recommendation for agents
 
-**Status:** Blocked. Aztec-side design is documented in `docs/05-future-work.md` under
-"Possibilities with Noir support". No Noir issue filed yet.
+- Flag duplicate IDs in review when this is unintentional.
+- If intentional pinning is desired, add explicit docs or validation discussion before code changes.
 
-**Upstream issue:** TBD -- to be filed against https://github.com/noir-lang/noir
+## G-6: Duplicate signatures remain hard errors across direct and transitive merges
+
+**Status:** Implemented behavior.
+
+**Decision:** selector and event-name collisions are compile failures even when introduced by transitive composition.
+
+**Evidence:** `collision_no_override` (direct), `transitive_diamond_leaf_collision`, and
+`transitive_diamond_leaf_collision_reverse` (transitive flattening).
+
+**Operational rule:** flattening contributes entries into one host merge surface before codegen; any duplicate
+selector or duplicated event symbol in that merged view fails fast.
+
+## G-4: Storage field injection blocked by Noir API
+
+**Status:** Upstream-blocked gap.
+
+**Gap:** host storage fields must be explicitly declared.
+
+**Root cause:** no `TypeDefinition::add_field` in Noir comptime API.
+
+**Design status:** full plan documented in [docs/05-future-work.md](05-future-work.md).
+
+### Why this matters to agents
+
+This is the last major known functional gap for parity and must stay in "upstream issue needed"
+state until Noir supports field injection.

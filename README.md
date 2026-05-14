@@ -1,12 +1,15 @@
 # Aztec Contract Template Composition
 
-> **Status:** Working PoC + test scaffold  
-> **Mechanism:** Generic contract-template composition via vendored Aztec macro changes  
-> **Flagship example:** `Amm` contract that IS a full AIP-20-style token at the same address
+> **What this is:** Production-focused validation of Solidity-style reuse via Aztec contract templates  
+> **Status:** Core behavior validated for macro-level composition features  
+> **Progress:** 12/18 implemented, 1 upstream-blocked gap, 2 BY_DESIGN, 3 OUT_OF_SCOPE  
+> **Mechanism:** Generic contract-template composition via vendored Aztec macro changes
 
-This repo proves that an Aztec contract can be registered as a **reusable template** and injected
-into a host contract, so the host behaves as if those functions had been written there directly --
-without new Noir syntax.
+Solidity inheritance lets you write `contract Amm is ERC20 { ... }` and the host gets the full
+parent surface. This repo validates how far that model can be implemented in Aztec without new Noir
+syntax -- and records the current behavior with executable proofs.
+
+See [docs/02-feature-matrix.md](docs/02-feature-matrix.md) for the full 18-hypothesis comparison.
 
 ---
 
@@ -26,18 +29,24 @@ vendor/aztec/              Vendored Aztec macro changes that make template compo
 src/
   aztec-token-mixin/       AIP-20 token template (TokenContractTemplate) + TokenInitParams
   amm_token/               Host contract: Amm = AMM pool + full token at one address
-  composition_fixtures/    Minimal foo/bar/mid/storage templates for hypothesis testing
+  composition_fixtures/    Minimal foo/bar/mid/storage/virtual templates for hypothesis testing
   composition_multi/       Proof: multi-template compose works
   composition_transitive/  Proof: transitive compose is flattened
   composition_host/        Proof: storage + events + library constants via compose
+  composition_override/    Proof: virtual/override mechanism works
+  composition_override_dual/  Proof: multiple override candidates and explicit direct overrides
+  composition_override_internal/  Proof: internal override behavior and local constraints
+  composition_override_transitive/  Proof: override works only across direct compose edge
+  composition_diamond_transitive/  Proof: duplicate selectors across transitive templates flattening
   composition_collision_fail/  Poison: name collision => fatal compile error (excluded from workspace)
 docs/
   01-architecture.md       How template composition works mechanically
-  02-feature-matrix.md     What is proven / what is a known gap (18 hypotheses)
+  02-feature-matrix.md     Solidity vs. Aztec: 18 hypotheses with current milestone status (authoritative tracker)
   03-gap-analysis.md       Root causes and decisions for every known gap
   04-template-authoring.md Rules for writing composable templates
-  05-future-work.md        Next steps: virtual/override, storage injection, language asks
-  archive/                 Superseded planning docs (historical reference)
+  05-future-work.md        What remains: storage injection (blocked on Noir upstream)
+  06-development-workflow.md  PR workflow, branch conventions, poison-pattern testing
+  07-design-decisions-and-progress.md  Agent inheritance playbook (good practices, no-gos, validation)
 ```
 
 ---
@@ -64,36 +73,52 @@ directly in `Amm`. Read [docs/01-architecture.md](docs/01-architecture.md) for t
 
 ---
 
-## What is proven
+## Solidity comparison: what works today
 
-| Claim | Evidence |
+| Solidity feature | Aztec today |
 |---|---|
-| Template functions are injected into host ABI | `composition_multi` tests |
-| Host can call composed internals directly | `composition_multi` + `composition_host` tests |
-| Composed storage reads/writes work | `composition_host` tests |
-| Library method constants migrate cross-crate | `composition_host` tests |
-| AMM `add_liquidity` mints LP via composed token internals | `amm_token/test/add_liquidity.nr` |
-| Full AIP-20 surface injected into one contract | `amm_token/test/token_surface.nr` |
+| Inherit a full contract surface | Yes (`compose("id")`) |
+| Call inherited internals from host | Yes |
+| Read/write inherited storage fields | Yes (host declares fields; template uses them by name) |
+| Library method constants cross-crate | Yes (`#[contract_library_method]`) |
+| Transitive inheritance flattening | Yes (recursive compose flattening) |
+| Event types available in derived contract | Yes (template events auto-replayed) |
+| `virtual`/`override` single function | Yes (`#[template_virtual]` + `override_template(...)`) |
+| Abstract contracts (all-virtual surface) | Yes (convention via `#[template_virtual]` on all externals) |
+| Constructor/initializer chain | Yes (host calls template init internal explicitly) |
+| Name collision is a hard error | Yes |
+| `super` dispatch | No -- flat merge only, no chain |
+| Automatic storage field injection | No -- host must declare fields (Noir upstream blocker) |
 
-See [docs/02-feature-matrix.md](docs/02-feature-matrix.md) for the complete 18-hypothesis matrix.
+Full evidence table: [docs/02-feature-matrix.md](docs/02-feature-matrix.md)
 
 ---
 
-## Current limitations (short version)
+## Known limitations
 
-- Host must declare all template storage fields manually (Noir lacks `TypeDefinition::add_field`)
-- Event structs used in composed bodies must be re-declared in the host
-- No virtual/override: same-name collision is a fatal compile error
-- Raw module-scope globals cannot be used in composable function bodies
+- **Host declares all template storage fields manually** -- `TypeDefinition::add_field` does not
+  exist in the Noir comptime API. This is the only remaining functional gap.
+  See [docs/03-gap-analysis.md](docs/03-gap-analysis.md) G-4 and [docs/05-future-work.md](docs/05-future-work.md).
+- **No `super` dispatch** -- Aztec composition is a flat merge. There is no parent-implementation
+  concept. This is architectural (BY_DESIGN), not a gap.
+- **Raw module-scope globals cannot be used in composable function bodies** -- use
+  `#[contract_library_method]` for template-owned constants. See [docs/04-template-authoring.md](docs/04-template-authoring.md).
 
-See [docs/03-gap-analysis.md](docs/03-gap-analysis.md) for root causes and workarounds.
+---
+
+## Design decisions and milestone notes
+
+To keep the evolution story clean while removing historical folders, key design decisions and
+engineering tradeoffs are now consolidated in:
+
+- [docs/07-design-decisions-and-progress.md](docs/07-design-decisions-and-progress.md)
 
 ---
 
 ## Read order
 
-1. [docs/01-architecture.md](docs/01-architecture.md) -- understand the mechanism
-2. [docs/02-feature-matrix.md](docs/02-feature-matrix.md) -- what works and what doesn't
-3. [docs/03-gap-analysis.md](docs/03-gap-analysis.md) -- why, and what's planned
+1. [docs/02-feature-matrix.md](docs/02-feature-matrix.md) -- the comparison: what Aztec can do vs. Solidity
+2. [docs/01-architecture.md](docs/01-architecture.md) -- understand the mechanism behind the comparison
+3. [docs/03-gap-analysis.md](docs/03-gap-analysis.md) -- why each gap exists, and what's planned
 4. [docs/04-template-authoring.md](docs/04-template-authoring.md) -- write your own template
 5. [docs/05-future-work.md](docs/05-future-work.md) -- what comes next

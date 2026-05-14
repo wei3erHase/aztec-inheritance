@@ -4,6 +4,16 @@
 > **Audience:** Developers integrating or extending the composition mechanism  
 > **Last updated:** 2026-05-13
 
+## 1) Agent lens: start here
+
+If you are implementing or reviewing inheritance-like behavior, first answer these 3 questions:
+
+1. Is this a **flat merge** effect or a **missing host requirement**?
+2. Does this depend on **names/visibility** from template internals?
+3. Is this an **upstream Noir blocker** in disguise?
+
+If you cannot answer (1) with explicit "copied/replayed surface" logic, do not assume any behavior.
+
 Template composition lets an Aztec contract be registered as a named template and then injected
 into a host contract, so the host behaves as if the template functions were written there directly.
 No new Noir syntax is required.
@@ -31,6 +41,12 @@ pub contract Amm { ... }
 ---
 
 ## Step-by-step flow
+
+Use this in code reviews:
+
+- Check that registration (`#[contract_template]`) and selection (`compose`) both happen.
+- Verify every host-facing requirement is either in storage, events, imports, or override metadata.
+- Trace registry state in `vendor/aztec/src/macros/template_registry.nr` for each claimed behavior.
 
 ### 1. Template registers itself
 
@@ -118,6 +134,20 @@ There is no dedicated validation pass today. Failures surface as normal type or 
 See [docs/04-template-authoring.md](04-template-authoring.md) for the explicit contract a template
 author must publish for host authors.
 
+### Host checklist before wiring a new template
+
+- Confirm required storage fields are copied from template docs into host `Storage`.
+- Confirm required traits/imports are available in host scope.
+- Confirm template init path (`internal`) is explicitly called by host constructor.
+- Confirm each composed public surface is intentional and collision-safe.
+- Confirm override entries (if any) are declared on a virtual function.
+
+### What to verify first when behavior is unclear
+
+- If a symbol fails to resolve in a composed body, classify it as host-scope binding mismatch first.
+- If storage field access fails, it is a host declaration gap unless field name/type was promised.
+- If the call graph appears to need a parent chain, classify it as non-goal unless `super` is implemented.
+
 ---
 
 ## Multi-template compose
@@ -131,22 +161,38 @@ pub contract MultiHost { ... }
 
 All template ids are iterated in `inject_template_functions_to_registries`. The resulting host
 gets the union of all template surfaces. Function name collisions between templates (or between
-a template and the host) are fatal -- there is no override mechanism today.
+a template and the host) are fatal unless an override is declared via
+`override_template("template_id", "fn_name")` (external) or
+`override_internal_template("template_id", "fn_name")` (internal) in `AztecConfig`.
 
 ---
 
 ## What composition is NOT
 
 - **No inheritance hierarchy:** this is merge-and-replay, not Solidity-style inheritance.
-  There is no `super` dispatch or method override chain; composed function sets are flattened
+  There is no `super` dispatch or C3 linearization; composed function sets are flattened
   into a single host surface.
-- **Not virtual/override:** same-name collision = fatal compile error.
+- **No `super`:** virtual/override is single-level only. A host can replace a template function
+  via `override_template("id", "fn")` or `override_internal_template("id", "fn")`, but cannot call
+  the original template implementation from the override. There is no parent-implementation concept in
+  a flat merge.
+  the override. There is no parent-implementation concept in a flat merge.
 - **Not automatic for storage:** fields must be manually declared in the host.
 - **Not a new language feature:** this is purely macro-level, working within Noir's existing
   comptime system.
 
 See [docs/02-feature-matrix.md](02-feature-matrix.md) for the full evidence table, and
 [docs/03-gap-analysis.md](03-gap-analysis.md) for root causes and planned fixes.
+
+## Debug playbook for architecture regressions
+
+When a behavior unexpectedly changed:
+
+1. Verify the selected template IDs in `AztecConfig`.
+2. Inspect flattening path in `compose_template.nr` (`inject_template_functions_to_registries`).
+3. Check override metadata in config is matching the same template ID.
+4. Inspect replay source in `get_composed_templates_quoted`.
+5. Re-open the evidence package before touching the vendor implementation.
 
 ---
 
@@ -156,10 +202,10 @@ All changes are in `vendor/aztec/src/macros/`:
 
 | File | Change |
 |---|---|
-| `aztec.nr` | `AztecConfig` grew `compose("id")` support; host codegen injects composed functions before dispatch generation |
-| `mod.nr` | `#[contract_template("id")]` registration macro added |
-| `template_registry.nr` | Keyed registry: template module, function wrappers, ABI exports, library helpers |
-| `compose_template.nr` | `inject_template_functions_to_registries` + `get_composed_templates_quoted` |
+| `aztec.nr` | `AztecConfig` grew `compose("id")` + `override_template("id","fn")`/`override_internal_template("id","fn")` support; host codegen injects composed functions before dispatch generation |
+| `mod.nr` | `#[contract_template("id")]` registration macro; captures external wrappers per-function and event structs |
+| `template_registry.nr` | Keyed registry: template module, per-function wrappers, ABI exports, library helpers, event structs, virtual flags |
+| `compose_template.nr` | `inject_template_functions_to_registries` (override-aware) + `get_composed_templates_quoted` (override-aware, events) + `compute_template_override_signatures` + `compute_template_internal_override_signatures` |
 | `internals_functions_generation/external_functions_registry.nr` | Composed external functions merged into host registries |
 | `internals_functions_generation/internal_functions_registry.nr` | Same for composed internals |
 | `events.nr` | `register_event_selector` made idempotent for same-name/same-signature re-registration |

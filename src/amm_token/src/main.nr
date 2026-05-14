@@ -17,11 +17,8 @@ use aztec::macros::{aztec, AztecConfig};
 
 #[aztec(AztecConfig::new().compose("aip20_token"))]
 pub contract Amm {
-use aztec::{
-        macros::{
-            functions::{external, initializer, internal, only_self, view},
-            storage::storage,
-        },
+    use aztec::{
+        macros::{functions::{external, initializer, internal, only_self, view}, storage::storage},
         protocol::address::AztecAddress,
         state_vars::{Map, Owned, PublicImmutable, PublicMutable, StateVariable},
     };
