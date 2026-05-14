@@ -7,4 +7,5 @@ members = [
   "src/composition_transitive",
   "src/composition_host",
   "src/composition_override",
+  "src/composition_diamond_transitive",
 ]
